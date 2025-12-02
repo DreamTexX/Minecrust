@@ -1,0 +1,11 @@
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.dependencies]
+minecrust_protocol = { path = "./crates/protocol" }
+tokio = { version = "1.48.0" }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+thiserror = "2.0.17"
+tracing = "0.1.43"
+bytes = "1.11.0"
