@@ -11,7 +11,7 @@ pub enum Error {
     #[error("unknown packet id: {0}")]
     UnknownPacket(i32),
     #[error(transparent)]
-    Io(#[from] tokio::io::Error),
+    Io(#[from] std::io::Error),
     #[error(transparent)]
     Utf8(#[from] FromUtf8Error),
 }

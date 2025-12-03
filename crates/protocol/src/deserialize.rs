@@ -3,6 +3,10 @@ use std::io::Read;
 use crate::{Result, datatype::VarInt};
 
 pub trait Deserialize: Sized {
+    fn consumed(&self) -> usize {
+        0
+    }
+
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self>;
 }
 

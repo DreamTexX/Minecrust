@@ -1,12 +1,19 @@
 use super::{CONTINUE_BIT, SEGMENT_BITS};
-use std::{io::Read, ops::Deref};
+use std::{env::consts, io::Read, ops::Deref};
 
 use crate::{Deserialize, Error, Result, serialize::Serialize};
 
 #[derive(Debug)]
-pub struct VarLong(i64);
+pub struct VarLong {
+    inner: i64,
+    consumed: usize,
+}
 
 impl Deserialize for VarLong {
+    fn consumed(&self) -> usize {
+        self.consumed
+    }
+
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self> {
         let mut value = 0;
         let mut position = 0;
@@ -27,7 +34,10 @@ impl Deserialize for VarLong {
             }
         }
 
-        Ok(Self(value))
+        Ok(Self {
+            inner: value,
+            consumed: position / 7 + 1,
+        })
     }
 }
 
@@ -52,13 +62,16 @@ impl Deref for VarLong {
     type Target = i64;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
 impl From<i64> for VarLong {
     fn from(value: i64) -> Self {
-        Self(value)
+        Self {
+            inner: value,
+            consumed: 0,
+        }
     }
 }
 
@@ -95,21 +108,25 @@ mod test {
     #[test]
     fn test_deserialize() {
         for (expected_num, mut reader) in TEST_CASES {
-            let var_int = VarLong::deserialize(&mut reader);
-            assert!(var_int.is_ok());
+            let num_bytes = reader.len();
+            let var_long = VarLong::deserialize(&mut reader);
+            assert!(var_long.is_ok());
 
-            let int = *var_int.unwrap();
+            let var_long = var_long.unwrap();
+            let int = *var_long;
             assert_eq!(int, expected_num);
+
+            assert_eq!(var_long.consumed(), num_bytes)
         }
     }
 
     #[test]
     fn test_serialize() {
         for (num, reader) in TEST_CASES {
-            let var_int: VarLong = num.into();
+            let var_long: VarLong = num.into();
 
             let mut writer: Vec<u8> = vec![];
-            assert!(var_int.serialize(&mut writer).is_ok());
+            assert!(var_long.serialize(&mut writer).is_ok());
             assert_eq!(writer.as_slice(), reader);
         }
     }

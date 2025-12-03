@@ -1,39 +1,19 @@
-use tokio::io::{AsyncRead, AsyncReadExt};
-
 use super::{CONTINUE_BIT, SEGMENT_BITS};
 use std::{io::Read, ops::Deref};
 
 use crate::{Deserialize, Error, Result, serialize::Serialize};
 
 #[derive(Debug)]
-pub struct VarInt(i32);
-
-impl VarInt {
-    pub async fn async_deserialize<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Self> {
-        let mut value = 0;
-        let mut position = 0;
-
-        loop {
-            let mut bytes = [0; 1];
-            reader.read_exact(&mut bytes).await?;
-
-            let byte = bytes[0];
-            value |= ((byte & SEGMENT_BITS) as i32) << position;
-
-            if (byte & CONTINUE_BIT) == 0 {
-                break;
-            }
-            position += 7;
-            if position > 32 {
-                return Err(Error::VarIntOverflow);
-            }
-        }
-
-        Ok(Self(value))
-    }
+pub struct VarInt {
+    inner: i32,
+    consumed: usize,
 }
 
 impl Deserialize for VarInt {
+    fn consumed(&self) -> usize {
+        self.consumed
+    }
+
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self> {
         let mut value = 0;
         let mut position = 0;
@@ -54,7 +34,10 @@ impl Deserialize for VarInt {
             }
         }
 
-        Ok(Self(value))
+        Ok(Self {
+            inner: value,
+            consumed: position / 7 + 1,
+        })
     }
 }
 
@@ -79,13 +62,16 @@ impl Deref for VarInt {
     type Target = i32;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
 impl From<i32> for VarInt {
     fn from(value: i32) -> Self {
-        Self(value)
+        Self {
+            inner: value,
+            consumed: 0,
+        }
     }
 }
 
@@ -110,11 +96,15 @@ mod test {
     #[test]
     fn test_deserialize() {
         for (expected_num, mut reader) in TEST_CASES {
+            let num_bytes = reader.len();
             let var_int = VarInt::deserialize(&mut reader);
             assert!(var_int.is_ok());
 
-            let int = *var_int.unwrap();
+            let var_int = var_int.unwrap();
+            let int = *var_int;
             assert_eq!(int, expected_num);
+
+            assert_eq!(var_int.consumed(), num_bytes)
         }
     }
 
