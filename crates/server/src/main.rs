@@ -48,6 +48,11 @@ async fn parse_packet_length<R: AsyncRead + Unpin>(
     loop {
         // peek the input stream
         peeked_bytes = reader.fill_buf().await?;
+        if peeked_bytes.is_empty() {
+            // EOF
+            return Ok(0);
+        }
+
         if peeked_bytes.len() >= 2 {
             // Smallest Minecraft Packet contains two bytes, one for the length and one for a 0x00
             // id with no data
@@ -73,6 +78,11 @@ async fn handle_connection<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
 
     loop {
         let packet_length = parse_packet_length(&mut reader).await?;
+        if packet_length == 0 {
+            tracing::trace!("no more packet received");
+            return Ok(());
+        }
+
         let mut packet_bytes = BytesMut::zeroed(packet_length);
         let bytes = reader.read_exact(&mut packet_bytes).await?;
         tracing::trace!(bytes, "read bytes into buffer");
