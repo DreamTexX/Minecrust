@@ -2,9 +2,12 @@ use std::{
     io::Cursor,
     net::{IpAddr, SocketAddr},
     str::FromStr,
+    sync::{Arc, LazyLock},
 };
 
+use arc_swap::ArcSwap;
 use bytes::BytesMut;
+use etcd_client::WatchOptions;
 use minecrust_protocol::{
     Deserialize, Serialize, VarInt,
     packets::v773::{
@@ -19,7 +22,19 @@ use tokio::{
     net::TcpListener,
     spawn,
 };
+use tracing::Instrument;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+static SERVER_STATE: LazyLock<ServerState> = LazyLock::new(|| {
+    ServerState {
+        motd: ArcSwap::from_pointee("This is a MineCrust server!".to_string()),
+    }
+});
+
+#[derive(Debug)]
+struct ServerState {
+    motd: ArcSwap<String>,
+}
 
 enum Status {
     Handshaking,
@@ -105,21 +120,21 @@ async fn handle_connection<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
                 StatusIncoming::StatusRequest(_) => {
                     tracing::debug!("received status request");
 
-                    let response = StatusOutgoing::StatusResponse(StatusResponse(
+                    let response = StatusOutgoing::StatusResponse(StatusResponse(format!(
                         r#"
-{
-    "version": {
-        "name": "1.21.10",
-        "protocol": 773
-    },
-    "description": {
-        "text": "Hello, world!"
-    },
-    "enforcesSecureChat": false
-}
-                                    "#
-                        .to_string(),
-                    ));
+                        {{
+                            "version": {{
+                                "name": "1.21.10",
+                                "protocol": 773
+                            }},
+                            "description": {{
+                                "text": "{}"
+                            }},
+                            "enforcesSecureChat": false
+                        }}
+                        "#,
+                        SERVER_STATE.motd.load()
+                    )));
                     response.serialize(&mut response_package_bytes)?;
 
                     current_status = Status::PingRequest;
@@ -159,13 +174,65 @@ async fn main() {
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
+    tokio::select! {
+        server_result = run_server() => {
+            if let Err(err) = server_result {
+                tracing::error!("running server exited with error: {}", err);
+            }
+        },
+        etcd_listener_result = run_etcd_listener() => {
+            if let Err(err) = etcd_listener_result {
+                tracing::error!("etcd listener exited with error: {}", err);
+            }
+        }
+    }
+}
+
+async fn run_etcd_listener() -> Result<(), etcd_client::Error> {
+    let mut client = etcd_client::Client::connect(["localhost:2379"], None).await?;
+
+    let (_watcher, mut stream) = client.watch("server", Some(WatchOptions::new().with_prev_key().with_prefix())).await?;
+
+    while let Some(message) = stream.message().await? {
+        if message.canceled() {
+            tracing::debug!("watcher canceled");
+            break;
+        }
+        if message.created() {
+            tracing::debug!(watch_id=message.watch_id(), "watcher created")
+        }
+
+        for event in message.events() {
+            if let Some(kv) = event.kv() {
+                let Ok(key) = kv.key_str() else {
+                    tracing::debug!("unparsable key received");
+                    continue;
+                };
+                match key {
+                    "server/motd" => {
+                        let motd: String = String::from_utf8_lossy(kv.value()).into_owned();
+                        tracing::debug!(key, motd, "updated server motd");
+                        SERVER_STATE.motd.store(Arc::new(motd));
+                    }
+                    key => {
+                        tracing::warn!(key, "unknown key received by watcher: {}", key);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_server() -> Result<(), tokio::io::Error> {
     tracing::trace!("creating listener");
     let listener = TcpListener::bind(SocketAddr::new(
         IpAddr::from_str("127.0.0.1").expect("ip to be parsed"),
         25565,
     ))
-    .await
-    .expect("listener to bind to 127.0.0.1:25565");
+    .await?;
+    let mut connection_count = 0usize;
 
     tracing::info!("listening on 127.0.0.1:25565");
 
@@ -174,12 +241,17 @@ async fn main() {
             tracing::debug!("error while accepting connection");
             continue;
         };
-        tracing::info!(?addr, "client connected");
-
         let (read_half, writ_half) = socket.into_split();
         let reader = BufReader::new(read_half);
         let writer = BufWriter::new(writ_half);
 
-        spawn(handle_connection(reader, writer));
+        let connection_id = connection_count;
+        connection_count = connection_count.wrapping_add(1usize);
+
+        let span = tracing::trace_span!("connection", connection_id);
+        span.in_scope(|| {
+            tracing::info!(?addr, "client connected");
+        });
+        spawn(handle_connection(reader, writer).instrument(span));
     }
 }

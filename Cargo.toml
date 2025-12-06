@@ -6,6 +6,8 @@ resolver = "3"
 minecrust_protocol = { path = "./crates/protocol" }
 tokio = { version = "1.48.0" }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+etcd-client = "0.17.0"
 thiserror = "2.0.17"
+arc-swap = "1.7.1"
 tracing = "0.1.43"
 bytes = "1.11.0"

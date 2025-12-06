@@ -34,6 +34,7 @@
             pkg-config
             cargo-edit
             etcd
+            protobuf
           ];
 
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
