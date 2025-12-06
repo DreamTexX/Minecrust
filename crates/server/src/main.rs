@@ -44,25 +44,29 @@ enum Status {
 async fn parse_packet_length<R: AsyncRead + Unpin>(
     reader: &mut BufReader<R>,
 ) -> minecrust_protocol::Result<usize> {
-    let mut peeked_bytes;
-    loop {
+    let packet_length: VarInt = loop {
         // peek the input stream
-        peeked_bytes = reader.fill_buf().await?;
+        let mut peeked_bytes = reader.fill_buf().await?;
         if peeked_bytes.is_empty() {
             // EOF
             return Ok(0);
         }
 
-        if peeked_bytes.len() >= 2 {
-            // Smallest Minecraft Packet contains two bytes, one for the length and one for a 0x00
-            // id with no data
-            break;
-        }
-    }
-
-    // todo: we somehow need to handle the case that not enough bytes where read and a wrong packet
-    // size got parsed...
-    let packet_length = VarInt::deserialize(&mut peeked_bytes)?;
+        match VarInt::deserialize(&mut peeked_bytes) {
+            Ok(value) => {
+                break value;
+            }
+            Err(err) => match err {
+                minecrust_protocol::Error::Io(err)
+                    if std::io::ErrorKind::UnexpectedEof == err.kind() =>
+                {
+                    // Not enough bytes read to build var int
+                    continue;
+                }
+                _ => return Err(err),
+            },
+        };
+    };
 
     // remove used bytes for packet length from reader
     reader.consume(packet_length.consumed());
