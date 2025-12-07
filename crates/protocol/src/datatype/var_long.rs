@@ -1,5 +1,5 @@
 use super::{CONTINUE_BIT, SEGMENT_BITS};
-use std::{env::consts, io::Read, ops::Deref};
+use std::{io::Read, ops::Deref};
 
 use crate::{Deserialize, Error, Result, serialize::Serialize};
 

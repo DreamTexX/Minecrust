@@ -1,14 +1,14 @@
 use std::io::Read;
 
-use crate::{Deserialize, Result, datatype::VarInt};
+use crate::{Deserialize, Result, datatype::{Intent, VarInt}};
 
 /// Handshaking | 0x00 | intention
 #[derive(Debug)]
 pub struct Intention {
-    protocol_version: VarInt,
-    server_address: String,
-    server_port: u16,
-    intent: VarInt,
+    pub protocol_version: VarInt,
+    pub server_address: String,
+    pub server_port: u16,
+    pub intent: Intent,
 }
 
 impl Deserialize for Intention {
@@ -16,7 +16,7 @@ impl Deserialize for Intention {
         let protocol_version = VarInt::deserialize(reader)?;
         let server_address = String::deserialize(reader)?;
         let server_port = u16::deserialize(reader)?;
-        let intent = VarInt::deserialize(reader)?;
+        let intent = Intent::deserialize(reader)?;
 
         Ok(Self {
             protocol_version,

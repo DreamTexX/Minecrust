@@ -3,6 +3,7 @@ use crate::{Deserialize, Error, Result, datatype::VarInt, serialize::Serialize};
 pub mod incoming;
 pub mod outgoing;
 
+#[derive(Debug)]
 pub enum HandshakingIncoming {
     Intention(incoming::Intention),
 }
@@ -23,6 +24,7 @@ impl Deserialize for HandshakingIncoming {
     }
 }
 
+#[derive(Debug)]
 pub enum StatusIncoming {
     StatusRequest(incoming::StatusRequest),
     PingRequest(incoming::PingRequest),
@@ -51,6 +53,7 @@ impl Deserialize for StatusIncoming {
     }
 }
 
+#[derive(Debug)]
 pub enum StatusOutgoing {
     StatusResponse(outgoing::StatusResponse),
     PongResponse(outgoing::PongResponse),
@@ -58,6 +61,8 @@ pub enum StatusOutgoing {
 
 impl Serialize for StatusOutgoing {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> Result<()> {
+        tracing::trace!(data=?self, "serializing status outgoing");
+
         let mut packet = Vec::new();
         match self {
             StatusOutgoing::StatusResponse(status_response) => {
