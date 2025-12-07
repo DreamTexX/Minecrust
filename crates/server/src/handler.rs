@@ -25,7 +25,7 @@ impl Handler for StatusHandler {
 
     async fn handle(&mut self) -> Result<(), minecrust_protocol::Error> {
         loop {
-            let mut packet = self.connection.next_packet().await?;
+            let mut packet = self.connection.read_packet().await?;
             match StatusIncoming::deserialize(&mut packet)? {
                 StatusIncoming::StatusRequest(_) => {
                     tracing::debug!("received status request");

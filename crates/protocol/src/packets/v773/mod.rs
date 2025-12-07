@@ -75,9 +75,7 @@ impl Serialize for StatusOutgoing {
             }
         }
 
-        VarInt::from(packet.len() as i32).serialize(writer)?;
         writer.write_all(&packet)?;
-
         Ok(())
     }
 }

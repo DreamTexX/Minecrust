@@ -1,4 +1,5 @@
 use std::{
+    error::Error,
     net::{IpAddr, SocketAddr},
     str::FromStr,
     sync::{
@@ -9,14 +10,19 @@ use std::{
 
 use arc_swap::ArcSwap;
 use etcd_client::{GetOptions, KeyValue, WatchOptions};
+use minecrust_protocol::datatype::Intent;
 use tokio::{
     net::{TcpListener, TcpStream},
-    spawn,
+    signal,
 };
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::Instrument;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::{connection::Connection, handler::Handler};
+use crate::{
+    connection::Connection,
+    handler::{Handler, StatusHandler},
+};
 
 mod connection;
 mod handler;
@@ -40,44 +46,54 @@ struct ServerState {
     description: ArcSwap<String>,
 }
 
-fn handle_connection(
-    stream: TcpStream,
-    addr: SocketAddr,
-) -> impl Future<Output = minecrust_protocol::Result<()>> {
+async fn client_loop(mut connection: Connection) -> minecrust_protocol::Result<()> {
+    let client_info = connection.handshake().await?;
+
+    match client_info.intent {
+        Intent::Status => StatusHandler::new(connection).handle().await?,
+        Intent::Login => {}
+        Intent::Transfer => {}
+    }
+
+    Ok(())
+}
+
+async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
     let id = CONNECTION_COUNT.fetch_add(1, Ordering::Relaxed);
     let span = tracing::trace_span!("connection", connection_id = id);
+    let connection = Connection::new(id, stream, addr);
 
-    async move {
-        let connection = Connection::new(id, stream, addr).await?;
-        let mut handler = connection.into_handler();
-        handler.handle().await?;
-
-        tracing::info!("closing connection");
-
-        Ok(())
+    if let Err(err) = client_loop(connection).instrument(span).await {
+        tracing::warn!(?err, "connection closed with error")
     }
-    .instrument(span)
+    tracing::info!("connection closed");
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    tokio::select! {
-        server_result = run_server() => {
-            if let Err(err) = server_result {
-                tracing::error!("running server exited with error: {}", err);
-            }
-        },
-        etcd_listener_result = run_etcd_listener() => {
-            if let Err(err) = etcd_listener_result {
-                tracing::error!("etcd listener exited with error: {}", err);
-            }
-        }
-    }
+    let cancellation_token = CancellationToken::new();
+    let tracker = TaskTracker::new();
+    tracker.spawn(run_etcd_listener(cancellation_token.clone()));
+    tracker.spawn(run_server(tracker.clone(), cancellation_token.clone()));
+
+    tracing::trace!("waiting for shutdown signal");
+    signal::ctrl_c().await?;
+    tracing::trace!("shutdown signal received");
+
+    cancellation_token.cancel();
+    tracing::trace!("cancellation issued");
+
+    tracker.close();
+    tracing::trace!("task tracker closed");
+    tracker.wait().await;
+    tracing::trace!("all tasks completed");
+
+    Ok(())
 }
 
 async fn parse_etcd_kv(kv: &KeyValue) -> Result<(), etcd_client::Error> {
@@ -98,7 +114,9 @@ async fn parse_etcd_kv(kv: &KeyValue) -> Result<(), etcd_client::Error> {
     Ok(())
 }
 
-async fn run_etcd_listener() -> Result<(), etcd_client::Error> {
+async fn run_etcd_listener(
+    cancellation_token: CancellationToken,
+) -> Result<(), etcd_client::Error> {
     let mut client = etcd_client::Client::connect(["localhost:2379"], None).await?;
 
     let (_watcher, mut stream) = client
@@ -115,39 +133,64 @@ async fn run_etcd_listener() -> Result<(), etcd_client::Error> {
         parse_etcd_kv(kv).await?;
     }
 
-    while let Some(message) = stream.message().await? {
-        if message.canceled() {
-            tracing::debug!("watcher canceled");
-            break;
-        }
-        if message.created() {
-            tracing::debug!(watch_id = message.watch_id(), "watcher created");
-        }
+    loop {
+        tokio::select! {
+            biased;
 
-        for event in message.events() {
-            if let Some(kv) = event.kv() {
-                parse_etcd_kv(kv).await?;
+            _ = cancellation_token.cancelled() => break,
+
+            maybe_message = stream.message() => {
+                if let Some(message) = maybe_message? {
+                    if message.canceled() {
+                        tracing::debug!("watcher canceled");
+                        break;
+                    }
+                    if message.created() {
+                        tracing::debug!(watch_id = message.watch_id(), "watcher created");
+                    }
+
+                    for event in message.events() {
+                        if let Some(kv) = event.kv() {
+                            parse_etcd_kv(kv).await?;
+                        }
+                    }
+                }
             }
         }
     }
 
+    tracing::trace!("stopping etcd watcher");
     Ok(())
 }
 
-async fn run_server() -> Result<(), tokio::io::Error> {
+async fn run_server(
+    tracker: TaskTracker,
+    cancellation_token: CancellationToken,
+) -> Result<(), tokio::io::Error> {
     let listener = TcpListener::bind(SocketAddr::new(
         IpAddr::from_str("127.0.0.1").expect("ip to be parsed"),
         25565,
     ))
     .await?;
-
     tracing::info!("listening on 127.0.0.1:25565");
-    loop {
-        let Ok((stream, addr)) = listener.accept().await else {
-            tracing::debug!("error while accepting connection");
-            continue;
-        };
 
-        spawn(handle_connection(stream, addr));
+    loop {
+        tokio::select! {
+            biased;
+
+            _ = cancellation_token.cancelled() => break,
+
+            accept = listener.accept() => {
+                let Ok((stream, addr)) = accept else {
+                    tracing::debug!("error while accepting connection");
+                    continue;
+                };
+
+                tracker.spawn(handle_connection(stream, addr));
+            }
+        }
     }
+
+    tracing::trace!("closing listener");
+    Ok(())
 }

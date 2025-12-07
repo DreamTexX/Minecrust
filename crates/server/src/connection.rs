@@ -14,8 +14,6 @@ use tokio::{
     },
 };
 
-use crate::handler::{Handler, StatusHandler};
-
 /// Method to get the packet length. This method efficiently bridges between the sync
 /// [`Deserialize`] API used in [`VarInt`] and the [`tokio::io::AsyncRead`] used in [`BufReader`].
 ///
@@ -62,86 +60,80 @@ async fn parse_packet_length<R: AsyncRead + Unpin>(
     Ok(*packet_length as usize)
 }
 
-async fn read_packet_from_reader(
-    reader: &mut BufReader<OwnedReadHalf>,
-) -> Result<Reader<Bytes>, minecrust_protocol::Error> {
-    let packet_length = parse_packet_length(reader).await?;
-    if packet_length == 0 {
-        tracing::trace!("handshake failed, no packet received");
-        return Err(minecrust_protocol::Error::Io(std::io::Error::new(
-            ErrorKind::UnexpectedEof,
-            "packet length was zero",
-        )));
-    }
-
-    let mut packet_bytes = BytesMut::zeroed(packet_length);
-    reader.read_exact(&mut packet_bytes).await?;
-
-    Ok(packet_bytes.freeze().reader())
+#[derive(Debug)]
+pub struct ClientInformation {
+    pub protocol_version: i32,
+    pub server_address: String,
+    pub server_port: u16,
+    pub intent: Intent,
 }
 
 #[derive(Debug)]
 pub struct Connection {
     pub id: usize,
-    pub protocol_version: i32,
-    pub server_address: String,
-    pub server_port: u16,
-    pub intent: Intent,
     pub client_address: SocketAddr,
     pub reader: BufReader<OwnedReadHalf>,
     pub writer: BufWriter<OwnedWriteHalf>,
 }
 
 impl Connection {
-    pub async fn new(
-        id: usize,
-        stream: TcpStream,
-        client_address: SocketAddr,
-    ) -> minecrust_protocol::Result<Self> {
+    pub fn new(id: usize, stream: TcpStream, client_address: SocketAddr) -> Self {
         tracing::info!(?client_address, "client connecting");
         let (read_half, write_half) = stream.into_split();
-        let mut reader = BufReader::new(read_half);
+        let reader = BufReader::new(read_half);
         let writer = BufWriter::new(write_half);
 
-        let mut packet = read_packet_from_reader(&mut reader).await?;
+        Self {
+            id,
+            client_address,
+            reader,
+            writer,
+        }
+    }
+
+    pub async fn handshake(&mut self) -> minecrust_protocol::Result<ClientInformation> {
+        let mut packet = self.read_packet().await?;
         match HandshakingIncoming::deserialize(&mut packet)? {
             HandshakingIncoming::Intention(packet) => {
                 tracing::debug!(?packet, "client handshake done");
                 tracing::info!("client connected");
 
-                Ok(Self {
-                    id,
+                Ok(ClientInformation {
                     protocol_version: *packet.protocol_version,
                     server_address: packet.server_address,
                     server_port: packet.server_port,
                     intent: packet.intent,
-                    client_address,
-                    reader,
-                    writer,
                 })
             }
         }
     }
 
-    pub fn next_packet(
-        &mut self,
-    ) -> impl Future<Output = minecrust_protocol::Result<Reader<Bytes>>> + Send {
-        read_packet_from_reader(&mut self.reader)
+    pub async fn read_packet(&mut self) -> minecrust_protocol::Result<Reader<Bytes>> {
+        let packet_length = parse_packet_length(&mut self.reader).await?;
+        if packet_length == 0 {
+            tracing::trace!("handshake failed, no packet received");
+            return Err(minecrust_protocol::Error::Io(std::io::Error::new(
+                ErrorKind::UnexpectedEof,
+                "packet length was zero",
+            )));
+        }
+
+        let mut packet_bytes = BytesMut::zeroed(packet_length);
+        self.reader.read_exact(&mut packet_bytes).await?;
+
+        Ok(packet_bytes.freeze().reader())
     }
 
     pub async fn send_packet(&mut self, packet: impl Serialize) -> minecrust_protocol::Result<()> {
         let mut response_package_bytes = Vec::new();
         packet.serialize(&mut response_package_bytes)?;
+
+        let mut packet_length = Vec::new();
+        VarInt::from(response_package_bytes.len() as i32).serialize(&mut packet_length)?;
+
+        self.writer.write_all(&packet_length).await?;
         self.writer.write_all(&response_package_bytes).await?;
         self.writer.flush().await?;
         Ok(())
-    }
-
-    pub fn into_handler(self) -> impl Handler {
-        match self.intent {
-            Intent::Status => StatusHandler::new(self),
-            Intent::Login => unimplemented!(),
-            Intent::Transfer => unimplemented!(),
-        }
     }
 }
