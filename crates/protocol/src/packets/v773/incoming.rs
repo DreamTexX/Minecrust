@@ -1,6 +1,9 @@
 use std::io::Read;
 
-use crate::{Deserialize, Result, datatype::{Intent, VarInt}};
+use crate::{
+    Deserialize, Result,
+    datatype::{Intent, VarInt},
+};
 
 /// Handshaking | 0x00 | intention
 #[derive(Debug)]

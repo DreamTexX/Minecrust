@@ -20,19 +20,21 @@ use tracing::Instrument;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
+    codec::PlainCodec,
     connection::Connection,
     handler::{Handler, StatusHandler},
 };
 
+mod codec;
 mod connection;
 mod handler;
 
-static CONNECTION_COUNT: AtomicUsize = AtomicUsize::new(0usize);
+static NEXT_CONNECTION_ID: AtomicUsize = AtomicUsize::new(0usize);
 static SERVER_STATE: LazyLock<ServerState> = LazyLock::new(|| ServerState {
     description: ArcSwap::from_pointee(
         r##"
         {
-            "text": "This is a minecraft Server!",
+            "text": "This is a Minecrust Server!",
             "type": "text",
             "color": "#f5d545"
         }
@@ -46,7 +48,7 @@ struct ServerState {
     description: ArcSwap<String>,
 }
 
-async fn client_loop(mut connection: Connection) -> minecrust_protocol::Result<()> {
+async fn client_loop(mut connection: Connection<PlainCodec>) -> minecrust_protocol::Result<()> {
     let client_info = connection.handshake().await?;
 
     match client_info.intent {
@@ -59,7 +61,7 @@ async fn client_loop(mut connection: Connection) -> minecrust_protocol::Result<(
 }
 
 async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
-    let id = CONNECTION_COUNT.fetch_add(1, Ordering::Relaxed);
+    let id = NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed);
     let span = tracing::trace_span!("connection", connection_id = id);
     let connection = Connection::new(id, stream, addr);
 

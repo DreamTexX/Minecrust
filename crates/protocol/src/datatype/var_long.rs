@@ -1,3 +1,5 @@
+use bytes::BufMut;
+
 use super::{CONTINUE_BIT, SEGMENT_BITS};
 use std::{io::Read, ops::Deref};
 
@@ -42,19 +44,17 @@ impl Deserialize for VarLong {
 }
 
 impl Serialize for VarLong {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> Result<()> {
+    fn serialize<B: BufMut>(&self, buf: &mut B) {
         let mut value = **self;
         loop {
             if (value & !(SEGMENT_BITS as i64)) == 0 {
-                writer.write_all(&[value as u8])?;
+                buf.put_u8(value as u8);
                 break;
             }
 
-            writer.write_all(&[(value as u8 & SEGMENT_BITS) | CONTINUE_BIT])?;
+            buf.put_u8((value as u8 & SEGMENT_BITS) | CONTINUE_BIT);
             value = (value as u64 >> 7) as i64;
         }
-
-        Ok(())
     }
 }
 
@@ -77,6 +77,8 @@ impl From<i64> for VarLong {
 
 #[cfg(test)]
 mod test {
+    use bytes::BytesMut;
+
     use super::*;
 
     const TEST_CASES: [(i64, &[u8]); 11] = [
@@ -125,9 +127,9 @@ mod test {
         for (num, reader) in TEST_CASES {
             let var_long: VarLong = num.into();
 
-            let mut writer: Vec<u8> = vec![];
-            assert!(var_long.serialize(&mut writer).is_ok());
-            assert_eq!(writer.as_slice(), reader);
+            let mut bytes = BytesMut::new();
+            var_long.serialize(&mut bytes);
+            assert_eq!(&bytes, reader);
         }
     }
 }

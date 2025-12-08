@@ -1,32 +1,29 @@
-use minecrust_protocol::{
-    Deserialize,
-    packets::v773::{
-        StatusIncoming, StatusOutgoing,
-        outgoing::{PongResponse, StatusResponse},
-    },
+use minecrust_protocol::packets::v773::{
+    StatusIncoming, StatusOutgoing,
+    outgoing::{PongResponse, StatusResponse},
 };
 
-use crate::{SERVER_STATE, connection::Connection};
+use crate::{SERVER_STATE, codec::Codec, connection::Connection};
 
 pub trait Handler {
-    fn new(connection: Connection) -> Self;
     fn handle(&mut self) -> impl Future<Output = Result<(), minecrust_protocol::Error>> + Send;
 }
 
 #[derive(Debug)]
-pub struct StatusHandler {
-    connection: Connection,
+pub struct StatusHandler<C: Codec> {
+    connection: Connection<C>,
 }
 
-impl Handler for StatusHandler {
-    fn new(connection: Connection) -> Self {
+impl<C: Codec> StatusHandler<C> {
+    pub fn new(connection: Connection<C>) -> Self {
         Self { connection }
     }
+}
 
+impl<C: Codec + Send> Handler for StatusHandler<C> {
     async fn handle(&mut self) -> Result<(), minecrust_protocol::Error> {
         loop {
-            let mut packet = self.connection.read_packet().await?;
-            match StatusIncoming::deserialize(&mut packet)? {
+            match self.connection.read().await? {
                 StatusIncoming::StatusRequest(_) => {
                     tracing::debug!("received status request");
 
@@ -44,7 +41,7 @@ impl Handler for StatusHandler {
                         "#,
                         SERVER_STATE.description.load()
                     )));
-                    self.connection.send_packet(response).await?;
+                    self.connection.write(response).await?;
                 }
                 StatusIncoming::PingRequest(packet) => {
                     tracing::debug!("received ping request");
@@ -52,7 +49,7 @@ impl Handler for StatusHandler {
                     let response = StatusOutgoing::PongResponse(PongResponse {
                         timestamp: packet.timestamp,
                     });
-                    self.connection.send_packet(response).await?;
+                    self.connection.write(response).await?;
                     return Ok(());
                 }
             }

@@ -1,3 +1,5 @@
+use bytes::BufMut;
+
 use crate::serialize::Serialize;
 
 /// Status | 0x00 | status_response
@@ -5,8 +7,8 @@ use crate::serialize::Serialize;
 pub struct StatusResponse(pub String);
 
 impl Serialize for StatusResponse {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> crate::Result<()> {
-        self.0.serialize(writer)
+    fn serialize<B: BufMut>(&self, buf: &mut B) {
+        self.0.serialize(buf)
     }
 }
 
@@ -17,7 +19,7 @@ pub struct PongResponse {
 }
 
 impl Serialize for PongResponse {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> crate::Result<()> {
-        self.timestamp.serialize(writer)
+    fn serialize<B: BufMut>(&self, buf: &mut B) {
+        self.timestamp.serialize(buf)
     }
 }

@@ -1,3 +1,5 @@
+use bytes::BufMut;
+
 use crate::{Deserialize, Error, Result, datatype::VarInt, serialize::Serialize};
 
 pub mod incoming;
@@ -60,22 +62,18 @@ pub enum StatusOutgoing {
 }
 
 impl Serialize for StatusOutgoing {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> Result<()> {
+    fn serialize<B: BufMut>(&self, buf: &mut B) {
         tracing::trace!(data=?self, "serializing status outgoing");
 
-        let mut packet = Vec::new();
         match self {
             StatusOutgoing::StatusResponse(status_response) => {
-                VarInt::from(0x00).serialize(&mut packet)?;
-                status_response.serialize(&mut packet)?;
+                VarInt::from(0x00).serialize(buf);
+                status_response.serialize(buf);
             }
             StatusOutgoing::PongResponse(pong_response) => {
-                VarInt::from(0x01).serialize(&mut packet)?;
-                pong_response.serialize(&mut packet)?;
+                VarInt::from(0x01).serialize(buf);
+                pong_response.serialize(buf);
             }
         }
-
-        writer.write_all(&packet)?;
-        Ok(())
     }
 }
