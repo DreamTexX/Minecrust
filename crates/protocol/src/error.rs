@@ -8,8 +8,8 @@ pub enum Error {
         "parsing a var long failed: data suggests there are more bytes but long is overflowing"
     )]
     VarLongOverflow,
-    #[error("unknown packet id: {0}")]
-    UnknownPacket(i32),
+    #[error("unknown packet id {0} in version {1}")]
+    UnknownPacket(i32, i32),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]

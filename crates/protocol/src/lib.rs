@@ -4,6 +4,6 @@ mod error;
 pub mod packets;
 mod serialize;
 
-pub use deserialize::Deserialize;
-pub use error::{Error, Result};
-pub use serialize::Serialize;
+pub use deserialize::*;
+pub use error::*;
+pub use serialize::*;

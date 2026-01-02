@@ -21,7 +21,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
     codec::PlainCodec,
-    connection::Connection,
+    connection::{Connection, handshake},
     handler::{Handler, StatusHandler},
 };
 
@@ -48,10 +48,8 @@ struct ServerState {
     description: ArcSwap<String>,
 }
 
-async fn client_loop(mut connection: Connection<PlainCodec>) -> minecrust_protocol::Result<()> {
-    let client_info = connection.handshake().await?;
-
-    match client_info.intent {
+async fn client_loop(connection: Connection<PlainCodec>) -> minecrust_protocol::Result<()> {
+    match connection.intent {
         Intent::Status => StatusHandler::new(connection).handle().await?,
         Intent::Login => {}
         Intent::Transfer => {}
@@ -63,12 +61,18 @@ async fn client_loop(mut connection: Connection<PlainCodec>) -> minecrust_protoc
 async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
     let id = NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed);
     let span = tracing::trace_span!("connection", connection_id = id);
-    let connection = Connection::new(id, stream, addr);
 
-    if let Err(err) = client_loop(connection).instrument(span).await {
-        tracing::warn!(?err, "connection closed with error")
-    }
-    tracing::info!("connection closed");
+    match handshake(id, stream, addr).await {
+        Ok(connection) => {
+            if let Err(err) = client_loop(connection).instrument(span).await {
+                tracing::warn!(?err, "connection closed with error")
+            }
+            tracing::info!("connection closed");
+        }
+        Err(err) => {
+            tracing::warn!(?err, "handshake failed")
+        }
+    };
 }
 
 #[tokio::main]

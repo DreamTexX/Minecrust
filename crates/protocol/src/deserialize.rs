@@ -2,6 +2,10 @@ use std::io::Read;
 
 use crate::{Result, datatype::VarInt};
 
+pub trait VersionedDeserialize: Sized {
+    fn deserialize<R: Read>(protocol_version: i32, reader: &mut R) -> Result<Self>;
+}
+
 pub trait Deserialize: Sized {
     fn consumed(&self) -> usize {
         0

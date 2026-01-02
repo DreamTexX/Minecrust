@@ -1,13 +1,13 @@
 use std::fmt::Debug;
 
 use bytes::{Buf, Bytes, BytesMut};
-use minecrust_protocol::{Deserialize, Result, Serialize, datatype::VarInt};
+use minecrust_protocol::{Deserialize, Result, Serialize, VersionedDeserialize, datatype::VarInt};
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt};
 
 pub trait Codec: Debug {
     fn encode<S: Serialize>(&self, packet: S) -> Result<Bytes>;
 
-    fn decode<D: Deserialize, R: AsyncBufRead + Send + Unpin>(
+    fn decode<D: VersionedDeserialize, R: AsyncBufRead + Send + Unpin>(
         &self,
         reader: &mut R,
     ) -> impl Future<Output = Result<D>> + Send;
@@ -78,7 +78,9 @@ pub trait Codec: Debug {
 }
 
 #[derive(Debug)]
-pub struct PlainCodec;
+pub struct PlainCodec {
+    pub protocol_version: i32,
+}
 
 impl Codec for PlainCodec {
     fn encode<S: Serialize>(&self, packet: S) -> Result<Bytes> {
@@ -92,12 +94,12 @@ impl Codec for PlainCodec {
         Ok(bytes.freeze())
     }
 
-    async fn decode<D: Deserialize, R: AsyncBufRead + Send + Unpin>(
+    async fn decode<D: VersionedDeserialize, R: AsyncBufRead + Send + Unpin>(
         &self,
         reader: &mut R,
     ) -> Result<D> {
         let bytes = Self::read_packet(reader).await?;
 
-        D::deserialize(&mut bytes.reader())
+        D::deserialize(self.protocol_version, &mut bytes.reader())
     }
 }

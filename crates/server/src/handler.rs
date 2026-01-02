@@ -1,5 +1,5 @@
-use minecrust_protocol::packets::v773::{
-    StatusIncoming, StatusOutgoing,
+use minecrust_protocol::packets::{
+    incoming::status::StatusPacket, StatusOutgoing,
     outgoing::{PongResponse, StatusResponse},
 };
 
@@ -24,7 +24,7 @@ impl<C: Codec + Send> Handler for StatusHandler<C> {
     async fn handle(&mut self) -> Result<(), minecrust_protocol::Error> {
         loop {
             match self.connection.read().await? {
-                StatusIncoming::StatusRequest(_) => {
+                StatusPacket::StatusRequest(_) => {
                     tracing::debug!("received status request");
 
                     let response = StatusOutgoing::StatusResponse(StatusResponse(format!(
@@ -43,7 +43,7 @@ impl<C: Codec + Send> Handler for StatusHandler<C> {
                     )));
                     self.connection.write(response).await?;
                 }
-                StatusIncoming::PingRequest(packet) => {
+                StatusPacket::PingRequest(packet) => {
                     tracing::debug!("received ping request");
 
                     let response = StatusOutgoing::PongResponse(PongResponse(packet.0));
