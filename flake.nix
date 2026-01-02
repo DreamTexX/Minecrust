@@ -35,6 +35,8 @@
             cargo-edit
             etcd
             protobuf
+            watchman
+            cargo-watch
           ];
 
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
