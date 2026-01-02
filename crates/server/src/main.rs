@@ -62,17 +62,24 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
     let id = NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed);
     let span = tracing::trace_span!("connection", connection_id = id);
 
-    match handshake(id, stream, addr).await {
-        Ok(connection) => {
-            if let Err(err) = client_loop(connection).instrument(span).await {
-                tracing::warn!(?err, "connection closed with error")
+    async {
+        match handshake(id, stream, addr).await {
+            Ok(connection) => {
+                tracing::trace!(?connection, "handshake done");
+                tracing::info!(ip=?addr.ip(), "client connected");
+
+                if let Err(err) = client_loop(connection).await {
+                    tracing::warn!(?err, "connection closed with error")
+                }
+                tracing::info!("connection closed");
             }
-            tracing::info!("connection closed");
-        }
-        Err(err) => {
-            tracing::warn!(?err, "handshake failed")
-        }
-    };
+            Err(err) => {
+                tracing::warn!(?err, "handshake failed")
+            }
+        };
+    }
+    .instrument(span)
+    .await;
 }
 
 #[tokio::main]

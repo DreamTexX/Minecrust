@@ -13,7 +13,7 @@ struct PacketArgs {
 pub fn parse_registry(input: DeriveInput) -> TokenStream {
     let match_arms = match parse_registry_data(&input.data) {
         Ok(stream) => stream,
-        Err(err) => return err.into_compile_error().into(),
+        Err(err) => return err.into_compile_error(),
     };
 
     let item_name = input.ident;

@@ -5,7 +5,7 @@ use syn::{Data, DeriveInput, Error, Fields, LitInt, spanned::Spanned};
 pub fn parse_deserialize(input: DeriveInput) -> TokenStream {
     let fn_body = match parse_deserialize_data(&input.data) {
         Ok(stream) => stream,
-        Err(err) => return err.into_compile_error().into(),
+        Err(err) => return err.into_compile_error(),
     };
 
     let item_name = input.ident;
@@ -58,18 +58,30 @@ fn parse_deserialize_data(data: &Data) -> Result<TokenStream, Error> {
                 let field = match variant.fields {
                     Fields::Unnamed(ref fields) => {
                         if fields.unnamed.len() > 1 {
-                            return Err(Error::new(fields.unnamed.span(), "Deserializing more than one packet is not supported"));
+                            return Err(Error::new(
+                                fields.unnamed.span(),
+                                "Deserializing more than one packet is not supported",
+                            ));
                         }
                         let Some(field) = fields.unnamed.first() else {
-                            return Err(Error::new(fields.unnamed.span(), "There must be one packet to deserialize"));
+                            return Err(Error::new(
+                                fields.unnamed.span(),
+                                "There must be one packet to deserialize",
+                            ));
                         };
                         field
-                    },
-                    Fields::Unit | Fields::Named(_) => return Err(Error::new(variant.span(), "This variant is not supported")),
+                    }
+                    Fields::Unit | Fields::Named(_) => {
+                        return Err(Error::new(variant.span(), "This variant is not supported"));
+                    }
                 };
 
-                let Some(attr) = variant.attrs.iter().find(|attr| attr.path().is_ident("id")) else {
-                    return Err(Error::new(variant.span(), "This variant requires an id attribute"));
+                let Some(attr) = variant.attrs.iter().find(|attr| attr.path().is_ident("id"))
+                else {
+                    return Err(Error::new(
+                        variant.span(),
+                        "This variant requires an id attribute",
+                    ));
                 };
                 let id: LitInt = attr.parse_args()?;
                 let id = id.base10_parse::<i32>()?;
@@ -78,8 +90,8 @@ fn parse_deserialize_data(data: &Data) -> Result<TokenStream, Error> {
 
                 match_arms.push(quote! {
                     #id => Self::#variant_ident(#packet_ident::deserialize(reader)?),
-                });  
-            };
+                });
+            }
 
             Ok(quote! {
                 let packet_id = VarInt::deserialize(reader)?;
@@ -88,7 +100,7 @@ fn parse_deserialize_data(data: &Data) -> Result<TokenStream, Error> {
                     id => return Err(crate::Error::UnknownPacket(id)),
                 })
             })
-        },
+        }
         Data::Union(data) => Err(Error::new(
             data.union_token.span,
             "Deserializing into unions is not supported",
