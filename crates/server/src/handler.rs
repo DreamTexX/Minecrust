@@ -46,9 +46,7 @@ impl<C: Codec + Send> Handler for StatusHandler<C> {
                 StatusIncoming::PingRequest(packet) => {
                     tracing::debug!("received ping request");
 
-                    let response = StatusOutgoing::PongResponse(PongResponse {
-                        timestamp: packet.timestamp,
-                    });
+                    let response = StatusOutgoing::PongResponse(PongResponse(packet.0));
                     self.connection.write(response).await?;
                     return Ok(());
                 }

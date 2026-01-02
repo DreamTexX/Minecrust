@@ -4,6 +4,7 @@ resolver = "3"
 
 [workspace.dependencies]
 minecrust_protocol = { path = "./crates/protocol" }
+minecrust_macro = { path = "./crates/macro"}
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 pin-project-lite = "0.2.16"
 etcd-client = "0.17.0"
