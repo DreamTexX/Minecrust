@@ -1,4 +1,6 @@
-use crate::{Deserialize, datatype::VarInt};
+use bytes::Buf;
+
+use crate::{Deserialize, Error, Serialize, datatype::VarInt};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Intent {
@@ -18,8 +20,25 @@ impl From<VarInt> for Intent {
     }
 }
 
+impl Into<i32> for &Intent {
+    fn into(self) -> i32 {
+        match self {
+            Intent::Status => 1,
+            Intent::Login => 2,
+            Intent::Transfer => 3,
+        }
+    }
+}
+
 impl Deserialize for Intent {
-    fn deserialize<R: std::io::Read>(reader: &mut R) -> crate::Result<Self> {
-        VarInt::deserialize(reader).map(|i| i.into())
+    fn deserialize<B: Buf>(buf: &mut B) -> Result<Self, Error> {
+        VarInt::deserialize(buf).map(|i| i.into())
+    }
+}
+
+impl Serialize for Intent {
+    fn serialize<B: bytes::BufMut>(&self, buf: &mut B) {
+        let value: i32 = self.into();
+        VarInt::from(value).serialize(buf);
     }
 }

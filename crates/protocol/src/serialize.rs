@@ -1,4 +1,5 @@
-use bytes::BufMut;
+use bytes::{BufMut, Bytes};
+use uuid::Uuid;
 
 use crate::datatype::VarInt;
 
@@ -65,5 +66,50 @@ impl Serialize for String {
         let bytes = self.as_bytes();
         VarInt::from(bytes.len() as i32).serialize(buf);
         buf.put_slice(bytes);
+    }
+}
+
+impl Serialize for Uuid {
+    fn serialize<B: BufMut>(&self, buf: &mut B) {
+        buf.put_slice(self.as_bytes());
+    }
+}
+
+impl<S: Serialize> Serialize for Vec<S> {
+    fn serialize<B: BufMut>(&self, buf: &mut B) {
+        let len = self.len();
+        VarInt::from(len as i32).serialize(buf);
+
+        for item in self {
+            item.serialize(buf);
+        }
+    }
+}
+
+impl<S: Serialize> Serialize for Option<S> {
+    fn serialize<B: BufMut>(&self, buf: &mut B) {
+        if let Some(data) = self {
+            true.serialize(buf);
+            data.serialize(buf);
+        } else {
+            false.serialize(buf);
+        }
+    }
+}
+
+impl Serialize for Bytes {
+    fn serialize<B: BufMut>(&self, buf: &mut B) {
+        buf.put(&self[..]);
+    }
+}
+
+impl<S: Serialize, const N: usize> Serialize for [S; N] {
+    fn serialize<B: BufMut>(&self, buf: &mut B) {
+        let len = self.len();
+        VarInt::from(len as i32).serialize(buf);
+
+        for item in self {
+            item.serialize(buf);
+        }
     }
 }

@@ -5,11 +5,16 @@ edition = "2024"
 
 [dependencies]
 minecrust_protocol = { workspace = true }
+minecrust_codec = { workspace = true }
+minecrust_macro = { workspace = true }
 tracing-subscriber = { workspace = true }
 pin-project-lite = { workspace = true }
 etcd-client = { workspace = true }
 tokio-util = { workspace = true }
+thiserror = { workspace = true }
 arc-swap = { workspace = true }
 tracing = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util", "signal"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util", "signal", "sync"] }
 bytes = { workspace = true }
+rand = { workspace = true }
+rsa = { workspace = true }

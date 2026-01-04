@@ -1,19 +1,19 @@
 use std::string::FromUtf8Error;
 
+use bytes::TryGetError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("parsing a var int failed: data suggests there are more bytes but int is overflowing")]
-    VarIntOverflow,
-    #[error(
-        "parsing a var long failed: data suggests there are more bytes but long is overflowing"
-    )]
-    VarLongOverflow,
-    #[error("unknown packet id {0} in version {1}")]
-    UnknownPacket(i32, i32),
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+    #[error("packets received are out of order")]
+    OutOfOrder,
+    #[error("input buffer does not contain enough data")]
+    UnexpectedEof,
+    #[error("input buffer contains to much data")]
+    Overflow,
+    #[error("{0}")]
+    Custom(&'static str),
     #[error(transparent)]
     Utf8(#[from] FromUtf8Error),
+    #[error(transparent)]
+    TryGetError(#[from] TryGetError),
 }
-
-pub type Result<T> = std::result::Result<T, Error>;

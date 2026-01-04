@@ -1,7 +1,7 @@
 pub mod datatype;
 mod deserialize;
 mod error;
-pub mod packets;
+pub mod packet;
 mod serialize;
 
 pub use deserialize::*;

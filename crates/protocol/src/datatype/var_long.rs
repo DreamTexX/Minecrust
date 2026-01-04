@@ -1,45 +1,35 @@
-use bytes::BufMut;
+use bytes::{Buf, BufMut};
 
 use super::{CONTINUE_BIT, SEGMENT_BITS};
-use std::{io::Read, ops::Deref};
+use std::ops::Deref;
 
-use crate::{Deserialize, Error, Result, serialize::Serialize};
+use crate::{Deserialize, Error, serialize::Serialize};
 
 #[derive(Debug)]
-pub struct VarLong {
-    inner: i64,
-    consumed: usize,
-}
+pub struct VarLong(i64);
 
 impl Deserialize for VarLong {
-    fn consumed(&self) -> usize {
-        self.consumed
-    }
-
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Self> {
+    fn deserialize<B: Buf>(buf: &mut B) -> Result<Self, Error> {
         let mut value = 0;
         let mut position = 0;
 
-        loop {
-            let mut bytes = [0; 1];
-            reader.read_exact(&mut bytes)?;
+        for i in 0..10 {
+            if buf.remaining() < i + 1 {
+                return Err(Error::UnexpectedEof);
+            }
 
-            let byte = bytes[0];
+            let byte = buf.chunk()[i];
             value |= ((byte & SEGMENT_BITS) as i64) << position;
 
             if (byte & CONTINUE_BIT) == 0 {
-                break;
+                buf.advance(i + 1);
+                return Ok(Self(value));
             }
+
             position += 7;
-            if position > 64 {
-                return Err(Error::VarLongOverflow);
-            }
         }
 
-        Ok(Self {
-            inner: value,
-            consumed: position / 7 + 1,
-        })
+        Err(Error::Overflow)
     }
 }
 
@@ -62,22 +52,19 @@ impl Deref for VarLong {
     type Target = i64;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.0
     }
 }
 
 impl From<i64> for VarLong {
     fn from(value: i64) -> Self {
-        Self {
-            inner: value,
-            consumed: 0,
-        }
+        Self(value)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use bytes::BytesMut;
+    use bytes::{Bytes, BytesMut};
 
     use super::*;
 
@@ -109,16 +96,17 @@ mod test {
 
     #[test]
     fn test_deserialize() {
-        for (expected_num, mut reader) in TEST_CASES {
-            let num_bytes = reader.len();
-            let var_long = VarLong::deserialize(&mut reader);
+        for (expected_num, bytes) in TEST_CASES {
+            let mut buf = Bytes::from_static(bytes);
+
+            let var_long = VarLong::deserialize(&mut buf);
             assert!(var_long.is_ok());
 
             let var_long = var_long.unwrap();
             let int = *var_long;
             assert_eq!(int, expected_num);
 
-            assert_eq!(var_long.consumed(), num_bytes)
+            assert_eq!(buf.len(), 0);
         }
     }
 

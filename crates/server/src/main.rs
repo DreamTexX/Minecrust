@@ -2,70 +2,62 @@ use std::{
     error::Error,
     net::{IpAddr, SocketAddr},
     str::FromStr,
-    sync::{
-        Arc, LazyLock,
-        atomic::{AtomicUsize, Ordering},
-    },
 };
 
-use arc_swap::ArcSwap;
-use etcd_client::{GetOptions, KeyValue, WatchOptions};
-use minecrust_protocol::datatype::Intent;
-use tokio::{
-    net::{TcpListener, TcpStream},
-    signal,
-};
+use tokio::{net::TcpListener, signal};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::Instrument;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::{
-    codec::PlainCodec,
-    connection::{Connection, handshake},
-    handler::{Handler, StatusHandler},
-};
+mod connection;
 
-mod codec;
+/*
+
 mod connection;
 mod handler;
-
-static NEXT_CONNECTION_ID: AtomicUsize = AtomicUsize::new(0usize);
-static SERVER_STATE: LazyLock<ServerState> = LazyLock::new(|| ServerState {
-    description: ArcSwap::from_pointee(
-        r##"
-        {
-            "text": "This is a Minecrust Server!",
-            "type": "text",
-            "color": "#f5d545"
-        }
-    "##
-        .to_string(),
-    ),
-});
 
 #[derive(Debug)]
 struct ServerState {
     description: ArcSwap<String>,
+    private_key: RsaPrivateKey,
+    public_key: RsaPublicKey,
 }
 
-async fn client_loop(connection: Connection<PlainCodec>) -> minecrust_protocol::Result<()> {
-    match connection.intent {
-        Intent::Status => StatusHandler::new(connection).handle().await?,
-        Intent::Login => {}
-        Intent::Transfer => {}
-    }
+#[derive(Debug)]
+struct ServerConfiguration {
+    description: ArcSwap<String>,
+    private_key: RsaPrivateKey,
+    public_key: RsaPublicKey,
+}
 
-    Ok(())
+#[derive(Debug)]
+struct Server {
+    cancellation_token: CancellationToken,
+    task_tracker: TaskTracker,
+    configuration: &'static ServerConfiguration,
+    next_connection_id: AtomicUsize,
+}
+
+impl Server {
+    pub fn new(
+        cancellation_token: CancellationToken,
+        task_tracker: TaskTracker,
+        configuration: &'static ServerConfiguration,
+    ) -> Self {
+        Self {
+            cancellation_token,
+            task_tracker,
+            configuration,
+            next_connection_id: AtomicUsize::new(0),
+        }
+    }
 }
 
 async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
-    let id = NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed);
-    let span = tracing::trace_span!("connection", connection_id = id);
+    let span = tracing::trace_span!("connection", connection_addr = ?addr);
 
     async {
-        match handshake(id, stream, addr).await {
+        match handshake(stream, addr).await {
             Ok(connection) => {
-                tracing::trace!(?connection, "handshake done");
                 tracing::info!(ip=?addr.ip(), "client connected");
 
                 if let Err(err) = client_loop(connection).await {
@@ -81,6 +73,40 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
     .instrument(span)
     .await;
 }
+*/
+
+async fn run_tcp_listener(
+    tracker: TaskTracker,
+    cancellation_token: CancellationToken,
+) -> Result<(), tokio::io::Error> {
+    let listener = TcpListener::bind(SocketAddr::new(
+        IpAddr::from_str("127.0.0.1").expect("ip to be parsed"),
+        25565,
+    ))
+    .await?;
+    tracing::info!("listening on 127.0.0.1:25565");
+
+    loop {
+        tokio::select! {
+            biased;
+
+            _ = cancellation_token.cancelled() => break,
+
+            accept = listener.accept() => {
+                let Ok((stream, _addr)) = accept else {
+                    tracing::debug!("error while accepting connection");
+                    continue;
+                };
+                let cancellation_token = cancellation_token.clone();
+
+                tracker.spawn(connection::handle_connection(cancellation_token, stream));
+            }
+        }
+    }
+
+    tracing::trace!("closing listener");
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -91,8 +117,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let cancellation_token = CancellationToken::new();
     let tracker = TaskTracker::new();
-    tracker.spawn(run_etcd_listener(cancellation_token.clone()));
-    tracker.spawn(run_server(tracker.clone(), cancellation_token.clone()));
+    // tracker.spawn(run_etcd_listener(cancellation_token.clone()));
+    tracker.spawn(run_tcp_listener(
+        tracker.clone(),
+        cancellation_token.clone(),
+    ));
 
     tracing::trace!("waiting for shutdown signal");
     signal::ctrl_c().await?;
@@ -109,6 +138,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/*
 async fn parse_etcd_kv(kv: &KeyValue) -> Result<(), etcd_client::Error> {
     let Ok(key) = kv.key_str() else {
         tracing::debug!("unparsable key received");
@@ -176,34 +206,5 @@ async fn run_etcd_listener(
     Ok(())
 }
 
-async fn run_server(
-    tracker: TaskTracker,
-    cancellation_token: CancellationToken,
-) -> Result<(), tokio::io::Error> {
-    let listener = TcpListener::bind(SocketAddr::new(
-        IpAddr::from_str("127.0.0.1").expect("ip to be parsed"),
-        25565,
-    ))
-    .await?;
-    tracing::info!("listening on 127.0.0.1:25565");
 
-    loop {
-        tokio::select! {
-            biased;
-
-            _ = cancellation_token.cancelled() => break,
-
-            accept = listener.accept() => {
-                let Ok((stream, addr)) = accept else {
-                    tracing::debug!("error while accepting connection");
-                    continue;
-                };
-
-                tracker.spawn(handle_connection(stream, addr));
-            }
-        }
-    }
-
-    tracing::trace!("closing listener");
-    Ok(())
-}
+*/

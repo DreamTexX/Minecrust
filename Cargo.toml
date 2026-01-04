@@ -2,9 +2,13 @@
 members = ["crates/*"]
 resolver = "3"
 
+[profile.dev.package.num-bigint-dig]
+opt-level = 3
+
 [workspace.dependencies]
 minecrust_protocol = { path = "./crates/protocol" }
-minecrust_macro = { path = "./crates/macro"}
+minecrust_codec = { path = "./crates/codec" }
+minecrust_macro = { path = "./crates/macro" }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 pin-project-lite = "0.2.16"
 etcd-client = "0.17.0"
@@ -14,3 +18,8 @@ arc-swap = "1.7.1"
 tracing = "0.1.43"
 bytes = "1.11.0"
 tokio = "1.48.0"
+rand = "=0.8.5"
+uuid = "1.19.0"
+rsa = "=0.9.9"
+aes = "0.8.4"
+cipher = "0.4.4"

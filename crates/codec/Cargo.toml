@@ -1,0 +1,10 @@
+[package]
+name = "minecrust_codec"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+minecrust_protocol = { workspace = true }
+bytes = { workspace = true }
+aes = { workspace = true }
+cipher = { workspace = true }

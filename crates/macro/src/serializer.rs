@@ -1,19 +1,8 @@
-use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Error, Fields, Index};
 
-#[derive(FromDeriveInput)]
-#[darling(attributes(packet))]
-struct PacketArgs {
-    id: i32,
-}
-
 pub fn parse_serialize(input: DeriveInput) -> TokenStream {
-    let PacketArgs { id: packet_id } = match PacketArgs::from_derive_input(&input) {
-        Ok(packet_args) => packet_args,
-        Err(err) => return err.write_errors(),
-    };
     let fn_body = match parse_serialize_data(&input.data) {
         Ok(stream) => stream,
         Err(err) => return err.into_compile_error(),
@@ -22,9 +11,8 @@ pub fn parse_serialize(input: DeriveInput) -> TokenStream {
     let item_name = input.ident;
     quote! {
         impl crate::Serialize for #item_name {
-            fn serialize<B: BufMut>(&self, buf: &mut B) {
+            fn serialize<B: bytes::BufMut>(&self, buf: &mut B) {
                 use crate::Serialize;
-                crate::datatype::VarInt::from(#packet_id).serialize(buf);
                 #fn_body
             }
         }
