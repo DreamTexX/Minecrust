@@ -134,9 +134,9 @@ impl Dispatcher for LoginDispatcher {
                     shared_secret.as_slice().try_into().unwrap(),
                 ));
                 actions.push(Action::SendPacket(
-                    (0x03, client::login::LoginCompression(VarInt::from(5))).into(),
+                    (0x03, client::login::LoginCompression(VarInt::from(256))).into(),
                 ));
-                actions.push(Action::EnableCompression(5));
+                actions.push(Action::EnableCompression(256));
                 actions.push(Action::SendPacket(
                     (
                         0x02,

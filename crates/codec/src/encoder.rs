@@ -38,8 +38,9 @@ impl PacketEncoder {
                     "compression results"
                 );
             } else {
-                frame.reserve(1);
-                frame.copy_within(0.., 1);
+                let len = frame.remaining();
+                frame.put_u8(0x00);
+                frame.copy_within(..len, 1);
                 frame[0] = 0x00;
             }
         }
