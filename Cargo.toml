@@ -11,11 +11,14 @@ minecrust_codec = { path = "./crates/codec" }
 minecrust_macro = { path = "./crates/macro" }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 pin-project-lite = "0.2.16"
+tokio-stream = "0.1.18"
 etcd-client = "0.17.0"
 tokio-util = { version = "0.7.17", features = ["rt"] }
 thiserror = "2.0.17"
 arc-swap = "1.7.1"
 tracing = "0.1.43"
+futures = { version = "0.3.31" }
+flate2 = "1.1.5"
 bytes = "1.11.0"
 tokio = "1.48.0"
 rand = "=0.8.5"

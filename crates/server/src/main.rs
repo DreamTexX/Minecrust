@@ -9,6 +9,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod connection;
+mod dispatcher;
 
 /*
 
@@ -87,17 +88,19 @@ async fn run_tcp_listener(
     tracing::info!("listening on 127.0.0.1:25565");
 
     loop {
+        tracing::trace!("waiting for connection");
         tokio::select! {
             biased;
 
             _ = cancellation_token.cancelled() => break,
 
             accept = listener.accept() => {
-                let Ok((stream, _addr)) = accept else {
+                let Ok((stream, remote_addr)) = accept else {
                     tracing::debug!("error while accepting connection");
                     continue;
                 };
                 let cancellation_token = cancellation_token.clone();
+                tracing::trace!(?remote_addr, "connection accepted");
 
                 tracker.spawn(connection::handle_connection(cancellation_token, stream));
             }
@@ -115,19 +118,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let cancellation_token = CancellationToken::new();
+    let shutdown_signal = CancellationToken::new();
     let tracker = TaskTracker::new();
     // tracker.spawn(run_etcd_listener(cancellation_token.clone()));
-    tracker.spawn(run_tcp_listener(
-        tracker.clone(),
-        cancellation_token.clone(),
-    ));
+    tracker.spawn(run_tcp_listener(tracker.clone(), shutdown_signal.clone()));
 
     tracing::trace!("waiting for shutdown signal");
     signal::ctrl_c().await?;
     tracing::trace!("shutdown signal received");
 
-    cancellation_token.cancel();
+    shutdown_signal.cancel();
     tracing::trace!("cancellation issued");
 
     tracker.close();

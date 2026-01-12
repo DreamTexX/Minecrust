@@ -5,7 +5,7 @@ use std::ops::Deref;
 
 use crate::{Deserialize, Error, serialize::Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct VarInt(i32);
 
 impl Deserialize for VarInt {

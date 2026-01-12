@@ -5,6 +5,10 @@ edition = "2024"
 
 [dependencies]
 minecrust_protocol = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+flate2 = { workspace = true }
+cipher = { workspace = true }
 bytes = { workspace = true }
 aes = { workspace = true }
-cipher = { workspace = true }

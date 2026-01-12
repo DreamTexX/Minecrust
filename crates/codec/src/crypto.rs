@@ -36,16 +36,4 @@ impl Cfb8Cipher {
 
         plain_byte
     }
-
-    pub fn encrypt(&mut self, buf: &mut [u8]) {
-        for b in buf.iter_mut() {
-            *b = self.encrypt_byte(*b);
-        }
-    }
-
-    pub fn decrypt(&mut self, buf: &mut [u8]) {
-        for b in buf.iter_mut() {
-            *b = self.decrypt_byte(*b);
-        }
-    }
 }

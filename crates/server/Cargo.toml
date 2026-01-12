@@ -9,12 +9,15 @@ minecrust_codec = { workspace = true }
 minecrust_macro = { workspace = true }
 tracing-subscriber = { workspace = true }
 pin-project-lite = { workspace = true }
+tokio-stream = { workspace = true }
 etcd-client = { workspace = true }
 tokio-util = { workspace = true }
 thiserror = { workspace = true }
 arc-swap = { workspace = true }
 tracing = { workspace = true }
+futures = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util", "signal", "sync"] }
 bytes = { workspace = true }
+uuid = { workspace = true }
 rand = { workspace = true }
 rsa = { workspace = true }

@@ -39,42 +39,6 @@ impl<C: Codec> StatusHandler<C> {
     }
 }
 
-impl<C: Codec + Send> Handler for StatusHandler<C> {
-    async fn handle(mut self) -> Result<Decision, minecrust_protocol::Error> {
-        let StatusPacket::StatusRequest(_) = self.connection.read().await? else {
-            return Err(minecrust_protocol::Error::UnexpectedPacket);
-        };
-        tracing::debug!("received status request");
-
-        let response = StatusResponse(format!(
-            // 773
-            r#"
-            {{
-                "version": {{
-                    "name": "Maintenance",
-                    "protocol": 0
-                }},
-                "description": {},
-                "enforcesSecureChat": false
-            }}
-            "#,
-            //SERVER_STATE.description.load()
-            "Todo: Reimplement description"
-        ));
-        self.connection.write(response).await?;
-
-        let StatusPacket::PingRequest(ping_request) = self.connection.read().await? else {
-            return Err(minecrust_protocol::Error::UnexpectedPacket);
-        };
-        tracing::debug!("received ping request");
-
-        let response = PongResponse(ping_request.0);
-        self.connection.write(response).await;
-
-        Ok(Decision::End)
-    }
-}
-
 pub struct LoginHandler<C: Codec> {
     connection: Connection<C>,
     verification_token: [u8; 32],

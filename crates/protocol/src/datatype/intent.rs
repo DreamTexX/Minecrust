@@ -20,9 +20,9 @@ impl From<VarInt> for Intent {
     }
 }
 
-impl Into<i32> for &Intent {
-    fn into(self) -> i32 {
-        match self {
+impl From<&Intent> for i32 {
+    fn from(value: &Intent) -> i32 {
+        match *value {
             Intent::Status => 1,
             Intent::Login => 2,
             Intent::Transfer => 3,
