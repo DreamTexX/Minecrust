@@ -1,4 +1,4 @@
-use minecrust_macro::Deserialize;
+use minecrust_protocol_macro::Deserialize;
 
 /// Status | 0x01
 #[derive(Debug, Deserialize)]

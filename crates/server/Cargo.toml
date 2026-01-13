@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 minecrust_protocol = { workspace = true }
 minecrust_codec = { workspace = true }
-minecrust_macro = { workspace = true }
 tracing-subscriber = { workspace = true }
 pin-project-lite = { workspace = true }
 tokio-stream = { workspace = true }

@@ -1,4 +1,4 @@
-use minecrust_macro::Serialize;
+use minecrust_protocol_macro::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct StatusResponse(pub String); // TODO: Json Status Response

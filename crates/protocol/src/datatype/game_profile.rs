@@ -1,4 +1,4 @@
-use minecrust_macro::Serialize;
+use minecrust_protocol_macro::Serialize;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize)]

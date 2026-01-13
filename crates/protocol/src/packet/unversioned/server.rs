@@ -1,4 +1,4 @@
-use minecrust_macro::{Deserialize, Serialize};
+use minecrust_protocol_macro::{Deserialize, Serialize};
 
 use crate::datatype::{Intent, VarInt};
 

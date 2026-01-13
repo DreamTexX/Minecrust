@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use minecrust_macro::Serialize;
+use minecrust_protocol_macro::Serialize;
 
 use crate::datatype::{GameProfile, TextComponent, VarInt};
 

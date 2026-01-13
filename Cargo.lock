@@ -649,23 +649,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "minecrust_macro"
+name = "minecrust_protocol"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "minecrust_protocol_macro",
+ "thiserror",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "minecrust_protocol_macro"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "minecrust_protocol"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "minecrust_macro",
- "thiserror",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -677,7 +677,6 @@ dependencies = [
  "etcd-client",
  "futures",
  "minecrust_codec",
- "minecrust_macro",
  "minecrust_protocol",
  "pin-project-lite",
  "rand",

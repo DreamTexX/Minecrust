@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use minecrust_macro::{Deserialize, Serialize};
+use minecrust_protocol_macro::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::datatype::VarInt;
