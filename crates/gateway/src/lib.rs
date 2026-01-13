@@ -1,26 +1,18 @@
-use std::{
-    error::Error,
-    net::{IpAddr, SocketAddr},
-    str::FromStr,
-};
+use std::net::SocketAddr;
 
-use tokio::{net::TcpListener, signal};
+use tokio::net::TcpListener;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod connection;
 mod dispatcher;
 
-async fn run_listener(
-    tracker: TaskTracker,
+pub async fn run(
     cancellation_token: CancellationToken,
+    tracker: TaskTracker,
+    addr: SocketAddr,
 ) -> Result<(), tokio::io::Error> {
-    let listener = TcpListener::bind(SocketAddr::new(
-        IpAddr::from_str("127.0.0.1").expect("ip to be parsed"),
-        25565,
-    ))
-    .await?;
-    tracing::info!("listening on 127.0.0.1:25565");
+    let listener = TcpListener::bind(addr).await?;
+    tracing::debug!(?addr, "listener created");
 
     loop {
         tracing::trace!("waiting for connection");
@@ -43,33 +35,6 @@ async fn run_listener(
     }
 
     tracing::trace!("closing listener");
-    Ok(())
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
-
-    let shutdown_signal = CancellationToken::new();
-    let tracker = TaskTracker::new();
-    // tracker.spawn(run_etcd_listener(cancellation_token.clone()));
-    tracker.spawn(run_listener(tracker.clone(), shutdown_signal.clone()));
-
-    tracing::trace!("waiting for shutdown signal");
-    signal::ctrl_c().await?;
-    tracing::trace!("shutdown signal received");
-
-    shutdown_signal.cancel();
-    tracing::trace!("cancellation issued");
-
-    tracker.close();
-    tracing::trace!("task tracker closed");
-    tracker.wait().await;
-    tracing::trace!("all tasks completed");
-
     Ok(())
 }
 

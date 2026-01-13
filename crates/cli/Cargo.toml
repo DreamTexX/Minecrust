@@ -1,0 +1,16 @@
+[package]
+name = "minecrust_cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+minecrust_gateway = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio-util = { version = "0.7.17" }
+tracing = { workspace = true }
+tokio = { workspace = true, features = [
+    "macros",
+    "rt-multi-thread",
+    "signal",
+] }
+clap = { workspace = true, features = ["cargo"] }

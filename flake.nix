@@ -35,8 +35,6 @@
             cargo-edit
             etcd
             protobuf
-            watchman
-            cargo-watch
             cargo-expand
           ];
 
