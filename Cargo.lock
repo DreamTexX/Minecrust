@@ -649,27 +649,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "minecrust_protocol"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "minecrust_protocol_macro",
- "thiserror",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "minecrust_protocol_macro"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "minecrust_server"
+name = "minecrust_gateway"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
@@ -687,6 +667,26 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "minecrust_protocol"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "minecrust_protocol_macro",
+ "thiserror",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "minecrust_protocol_macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

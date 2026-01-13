@@ -1,5 +1,5 @@
 [package]
-name = "minecrust_server"
+name = "minecrust_gateway"
 version = "0.1.0"
 edition = "2024"
 

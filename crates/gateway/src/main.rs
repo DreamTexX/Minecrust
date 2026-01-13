@@ -11,72 +11,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod connection;
 mod dispatcher;
 
-/*
-
-mod connection;
-mod handler;
-
-#[derive(Debug)]
-struct ServerState {
-    description: ArcSwap<String>,
-    private_key: RsaPrivateKey,
-    public_key: RsaPublicKey,
-}
-
-#[derive(Debug)]
-struct ServerConfiguration {
-    description: ArcSwap<String>,
-    private_key: RsaPrivateKey,
-    public_key: RsaPublicKey,
-}
-
-#[derive(Debug)]
-struct Server {
-    cancellation_token: CancellationToken,
-    task_tracker: TaskTracker,
-    configuration: &'static ServerConfiguration,
-    next_connection_id: AtomicUsize,
-}
-
-impl Server {
-    pub fn new(
-        cancellation_token: CancellationToken,
-        task_tracker: TaskTracker,
-        configuration: &'static ServerConfiguration,
-    ) -> Self {
-        Self {
-            cancellation_token,
-            task_tracker,
-            configuration,
-            next_connection_id: AtomicUsize::new(0),
-        }
-    }
-}
-
-async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
-    let span = tracing::trace_span!("connection", connection_addr = ?addr);
-
-    async {
-        match handshake(stream, addr).await {
-            Ok(connection) => {
-                tracing::info!(ip=?addr.ip(), "client connected");
-
-                if let Err(err) = client_loop(connection).await {
-                    tracing::warn!(?err, "connection closed with error")
-                }
-                tracing::info!("connection closed");
-            }
-            Err(err) => {
-                tracing::warn!(?err, "handshake failed")
-            }
-        };
-    }
-    .instrument(span)
-    .await;
-}
-*/
-
-async fn run_tcp_listener(
+async fn run_listener(
     tracker: TaskTracker,
     cancellation_token: CancellationToken,
 ) -> Result<(), tokio::io::Error> {
@@ -121,7 +56,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let shutdown_signal = CancellationToken::new();
     let tracker = TaskTracker::new();
     // tracker.spawn(run_etcd_listener(cancellation_token.clone()));
-    tracker.spawn(run_tcp_listener(tracker.clone(), shutdown_signal.clone()));
+    tracker.spawn(run_listener(tracker.clone(), shutdown_signal.clone()));
 
     tracing::trace!("waiting for shutdown signal");
     signal::ctrl_c().await?;

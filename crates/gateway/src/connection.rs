@@ -38,6 +38,25 @@ pub(crate) enum Action {
     SendPacket(RawPacket),
 }
 
+#[derive(Debug, Clone, Copy)]
+struct Context {
+    protocol_state: ProtocolState,
+    protocol_version: u32,
+}
+
+fn get_dispatcher(context: &Context) -> Result<Box<dyn Dispatcher + Send>, ConnectionError> {
+    let dispatcher: Box<dyn Dispatcher + Send> = match (context.protocol_state, context.protocol_version) {
+        (ProtocolState::Status, 773..) => Box::new(dispatcher::v773::StatusDispatcher),
+        (ProtocolState::Login, 773..) => Box::new(dispatcher::v773::LoginDispatcher::new()),
+        (_, _) => {
+            tracing::error!(?context, "no dispatcher found");
+            return Err(ConnectionError::Custom("no dispatcher found"));
+        }
+    };
+
+    Ok(dispatcher)
+}
+
 pub(crate) async fn handle_connection(
     shutdown_signal: CancellationToken,
     stream: TcpStream,
@@ -45,8 +64,10 @@ pub(crate) async fn handle_connection(
     tracing::trace!("handle connection started");
 
     let mut stream = Framed::new(stream, PacketCodec::default());
-    let mut protocol_state = ProtocolState::Handshake;
-    let mut protocol_version: u32 = 0;
+    let mut context = Context {
+        protocol_state: ProtocolState::Handshake,
+        protocol_version: 0,
+    };
     let mut dispatcher: Box<dyn Dispatcher + Send> =
         Box::new(dispatcher::unversioned::HandshakeDispatcher);
 
@@ -58,7 +79,6 @@ pub(crate) async fn handle_connection(
         let actions = dispatcher.dispatch(raw_packet)?;
 
         tracing::trace!(?actions, "running action");
-        let mut dispatcher_switch_needed = false;
         for action in actions {
             match action {
                 Action::EnableEncryption(shared_secret) => {
@@ -68,32 +88,17 @@ pub(crate) async fn handle_connection(
                     stream.codec_mut().enable_compression(threshold);
                 }
                 Action::ProtocolState(new_protocol_state) => {
-                    protocol_state = new_protocol_state;
-                    dispatcher_switch_needed = true;
+                    context.protocol_state = new_protocol_state;
+                    dispatcher = get_dispatcher(&context)?;
                 }
                 Action::ProtocolVersion(new_protocol_version) => {
-                    protocol_version = new_protocol_version;
-                    dispatcher_switch_needed = true;
+                    context.protocol_version = new_protocol_version;
+                    dispatcher = get_dispatcher(&context)?;
                 }
                 Action::SendPacket(packet) => {
                     stream.send(packet).await?;
                 }
             }
-        }
-
-        if dispatcher_switch_needed {
-            match (protocol_state, protocol_version) {
-                (ProtocolState::Status, 773..) => {
-                    dispatcher = Box::new(dispatcher::v773::StatusDispatcher);
-                }
-                (ProtocolState::Login, 773..) => {
-                    dispatcher = Box::new(dispatcher::v773::LoginDispatcher::new());
-                }
-                (_, _) => {
-                    tracing::error!(?protocol_state, protocol_version, "no dispatcher found");
-                    return Err(ConnectionError::Custom("no dispatcher found"));
-                }
-            };
         }
     }
 
