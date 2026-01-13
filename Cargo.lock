@@ -678,7 +678,6 @@ dependencies = [
  "futures",
  "minecrust_codec",
  "minecrust_protocol",
- "pin-project-lite",
  "rand",
  "rsa",
  "thiserror",

@@ -10,7 +10,6 @@ minecrust_protocol_macro = { path = "./crates/protocol_macro" }
 minecrust_protocol = { path = "./crates/protocol" }
 minecrust_codec = { path = "./crates/codec" }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-pin-project-lite = "0.2.16"
 tokio-stream = "0.1.18"
 etcd-client = "0.17.0"
 tokio-util = { version = "0.7.17", features = ["rt"] }
