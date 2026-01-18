@@ -1,6 +1,6 @@
 use bytes::{Buf, BufMut, BytesMut};
 use flate2::{Compression, read::ZlibEncoder};
-use minecrust_protocol::{Serialize, datatype::VarInt};
+use minecrust_protocol::{Serialize, datatype::var_int};
 use std::io::copy;
 use tokio_util::codec::Encoder;
 
@@ -27,7 +27,7 @@ impl PacketEncoder {
 
             if packet_size >= *threshold {
                 let inflated_bytes = frame.split();
-                VarInt::from(packet_size as i32).serialize(frame);
+                var_int::serialize(&(packet_size as i32), frame);
                 let mut writer = frame.writer();
                 let mut encoder = ZlibEncoder::new(&*inflated_bytes, Compression::default());
                 copy(&mut encoder, &mut writer)?;
@@ -70,12 +70,12 @@ impl Encoder<RawPacket> for PacketEncoder {
     fn encode(&mut self, raw_packet: RawPacket, dst: &mut BytesMut) -> Result<(), Self::Error> {
         tracing::trace!(?raw_packet, "encoding packet");
         let mut frame = BytesMut::new();
-        raw_packet.id.serialize(&mut frame);
+        var_int::serialize(&raw_packet.id, &mut frame);
         raw_packet.data.serialize(&mut frame);
 
         self.deflate(&mut frame)?;
         let finished_frame = frame.split();
-        VarInt::from(finished_frame.remaining() as i32).serialize(&mut frame);
+        var_int::serialize(&(finished_frame.remaining() as i32), &mut frame);
         frame.unsplit(finished_frame);
 
         self.encrypt(&mut frame);

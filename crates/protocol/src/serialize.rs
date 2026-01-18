@@ -1,7 +1,7 @@
 use bytes::{BufMut, Bytes};
 use uuid::Uuid;
 
-use crate::datatype::VarInt;
+use crate::datatype::var_int;
 
 pub trait Serialize {
     fn serialize<B: BufMut>(&self, buf: &mut B);
@@ -64,7 +64,7 @@ impl Serialize for f64 {
 impl Serialize for String {
     fn serialize<B: BufMut>(&self, buf: &mut B) {
         let bytes = self.as_bytes();
-        VarInt::from(bytes.len() as i32).serialize(buf);
+        var_int::serialize(&(bytes.len() as i32), buf);
         buf.put_slice(bytes);
     }
 }
@@ -78,7 +78,7 @@ impl Serialize for Uuid {
 impl<S: Serialize> Serialize for Vec<S> {
     fn serialize<B: BufMut>(&self, buf: &mut B) {
         let len = self.len();
-        VarInt::from(len as i32).serialize(buf);
+        var_int::serialize(&(len as i32), buf);
 
         for item in self {
             item.serialize(buf);
@@ -106,7 +106,7 @@ impl Serialize for Bytes {
 impl<S: Serialize, const N: usize> Serialize for [S; N] {
     fn serialize<B: BufMut>(&self, buf: &mut B) {
         let len = self.len();
-        VarInt::from(len as i32).serialize(buf);
+        var_int::serialize(&(len as i32), buf);
 
         for item in self {
             item.serialize(buf);

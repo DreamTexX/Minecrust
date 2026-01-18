@@ -2,8 +2,10 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Error, Fields, Index};
 
+use crate::FieldAttributes;
+
 pub fn parse_serialize(input: DeriveInput) -> TokenStream {
-    let fn_body = match parse_serialize_data(&input.data) {
+    let fn_body = match parse_serialize_data(input.data) {
         Ok(stream) => stream,
         Err(err) => return err.into_compile_error(),
     };
@@ -19,27 +21,50 @@ pub fn parse_serialize(input: DeriveInput) -> TokenStream {
     }
 }
 
-fn parse_serialize_data(data: &Data) -> Result<TokenStream, Error> {
+fn parse_serialize_data(data: Data) -> Result<TokenStream, Error> {
     match data {
         Data::Struct(data) => Ok(match data.fields {
-            Fields::Named(ref fields) => {
-                let statements = fields.named.iter().map(|field| {
-                    let field_ident = &field.ident;
-                    quote! {
-                        self.#field_ident.serialize(buf);
-                    }
-                });
+            Fields::Named(mut fields) => {
+                let statements = fields
+                    .named
+                    .iter_mut()
+                    .map(|field| {
+                        let FieldAttributes { with } = deluxe::extract_attributes(field)?;
+                        let field_ident = &field.ident;
+                        Ok(if let Some(with) = with {
+                            quote! {
+                                #with::serialize(&self.#field_ident, buf);
+                            }
+                        } else {
+                            quote! {
+                                self.#field_ident.serialize(buf);
+                            }
+                        })
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?;
                 quote! {
                     #(#statements)*
                 }
             }
-            Fields::Unnamed(ref fields) => {
-                let statements = fields.unnamed.iter().enumerate().map(|(index, _)| {
-                    let field_index = Index::from(index);
-                    quote! {
-                        self.#field_index.serialize(buf);
-                    }
-                });
+            Fields::Unnamed(mut fields) => {
+                let statements = fields
+                    .unnamed
+                    .iter_mut()
+                    .enumerate()
+                    .map(|(index, field)| {
+                        let FieldAttributes { with } = deluxe::extract_attributes(field)?;
+                        let field_index = Index::from(index);
+                        Ok(if let Some(with) = with {
+                            quote! {
+                                #with::serialize(&self.#field_index, buf);
+                            }
+                        } else {
+                            quote! {
+                                self.#field_index.serialize(buf);
+                            }
+                        })
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?;
                 quote! {
                     #(#statements)*
                 }

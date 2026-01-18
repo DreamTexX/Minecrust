@@ -12,18 +12,22 @@ minecrust_gateway = { path = "./crates/gateway" }
 minecrust_codec = { path = "./crates/codec" }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 tokio-stream = "0.1.18"
+proc-macro2 = "1.0.104"
 etcd-client = "0.17.0"
-tokio-util = { version = "0.7.17" }
+tokio-util = "0.7.17"
 thiserror = "2.0.17"
 arc-swap = "1.7.1"
+deluxe = "0.5.0"
 tracing = "0.1.43"
-futures = { version = "0.3.31" }
+futures = "0.3.31"
 flate2 = "1.1.5"
 cipher = "0.4.4"
 bytes = "1.11.0"
 tokio = "1.48.0"
+quote = "1.0.42"
 rand = "=0.8.5"
 uuid = "1.19.0"
 clap = "4.5.54"
 rsa = "=0.9.9"
 aes = "0.8.4"
+syn = "2.0.112"

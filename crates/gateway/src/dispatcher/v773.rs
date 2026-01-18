@@ -1,6 +1,6 @@
 use minecrust_codec::packet::RawPacket;
 use minecrust_protocol::{
-    datatype::{GameProfile, TextComponent, VarInt},
+    datatype::{GameProfile, TextComponent},
     packet::v773::{
         client::{
             self,
@@ -23,7 +23,7 @@ pub(crate) struct StatusDispatcher;
 impl Dispatcher for StatusDispatcher {
     fn dispatch(&mut self, raw_packet: RawPacket) -> Result<Vec<Action>, ConnectionError> {
         let mut actions = vec![];
-        match *raw_packet.id {
+        match raw_packet.id {
             // Status Request
             0x00 => {
                 actions.push(Action::SendPacket(
@@ -85,7 +85,7 @@ impl LoginDispatcher {
 impl Dispatcher for LoginDispatcher {
     fn dispatch(&mut self, raw_packet: RawPacket) -> Result<Vec<Action>, ConnectionError> {
         let mut actions = vec![];
-        match *raw_packet.id {
+        match raw_packet.id {
             0x00 => {
                 let server::login::Hello { name, player_uuid } = raw_packet.try_into()?;
                 tracing::trace!(name, ?player_uuid, "hello");
@@ -134,7 +134,7 @@ impl Dispatcher for LoginDispatcher {
                     shared_secret.as_slice().try_into().unwrap(),
                 ));
                 actions.push(Action::SendPacket(
-                    (0x03, client::login::LoginCompression(VarInt::from(256))).into(),
+                    (0x03, client::login::LoginCompression(256)).into(),
                 ));
                 actions.push(Action::EnableCompression(256));
                 actions.push(Action::SendPacket(

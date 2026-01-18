@@ -1,7 +1,7 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use uuid::Uuid;
 
-use crate::{Error, datatype::VarInt};
+use crate::{Error, datatype::var_int};
 
 pub trait Deserialize: Sized {
     fn deserialize<B: Buf>(buf: &mut B) -> Result<Self, Error>;
@@ -64,7 +64,7 @@ impl Deserialize for f64 {
 impl Deserialize for String {
     fn deserialize<B: Buf>(buf: &mut B) -> Result<Self, Error> {
         tracing::trace!("reading string");
-        let len: usize = *VarInt::deserialize(buf)? as usize;
+        let len: usize = var_int::deserialize(buf)? as usize;
         tracing::trace!(len, "string size");
 
         if len > 0 {
@@ -89,7 +89,7 @@ impl Deserialize for Uuid {
 
 impl<D: Deserialize> Deserialize for Vec<D> {
     fn deserialize<B: Buf>(buf: &mut B) -> Result<Self, Error> {
-        let len = *VarInt::deserialize(buf)?;
+        let len = var_int::deserialize(buf)?;
         let mut array = vec![];
 
         for _ in 0..len {

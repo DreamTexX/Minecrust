@@ -1,13 +1,12 @@
 mod game_profile;
 mod intent;
 mod text_component;
-mod var_int;
+pub mod var_int;
 mod var_long;
 
 pub use game_profile::*;
 pub use intent::*;
 pub use text_component::*;
-pub use var_int::*;
 pub use var_long::*;
 
 pub(crate) const SEGMENT_BITS: u8 = 0x7F;

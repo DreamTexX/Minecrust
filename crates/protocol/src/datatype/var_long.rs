@@ -1,64 +1,42 @@
 use bytes::{Buf, BufMut};
 
 use super::{CONTINUE_BIT, SEGMENT_BITS};
-use std::ops::Deref;
 
-use crate::{Deserialize, Error, serialize::Serialize};
+use crate::Error;
 
-#[derive(Debug)]
-pub struct VarLong(i64);
+pub fn deserialize<B: Buf>(buf: &mut B) -> Result<i64, Error> {
+    let mut value = 0;
+    let mut position = 0;
 
-impl Deserialize for VarLong {
-    fn deserialize<B: Buf>(buf: &mut B) -> Result<Self, Error> {
-        let mut value = 0;
-        let mut position = 0;
-
-        for i in 0..10 {
-            if buf.remaining() < i + 1 {
-                return Err(Error::UnexpectedEof);
-            }
-
-            let byte = buf.chunk()[i];
-            value |= ((byte & SEGMENT_BITS) as i64) << position;
-
-            if (byte & CONTINUE_BIT) == 0 {
-                buf.advance(i + 1);
-                return Ok(Self(value));
-            }
-
-            position += 7;
+    for i in 0..10 {
+        if buf.remaining() < i + 1 {
+            return Err(Error::UnexpectedEof);
         }
 
-        Err(Error::Overflow)
-    }
-}
+        let byte = buf.chunk()[i];
+        value |= ((byte & SEGMENT_BITS) as i64) << position;
 
-impl Serialize for VarLong {
-    fn serialize<B: BufMut>(&self, buf: &mut B) {
-        let mut value = **self;
-        loop {
-            if (value & !(SEGMENT_BITS as i64)) == 0 {
-                buf.put_u8(value as u8);
-                break;
-            }
-
-            buf.put_u8((value as u8 & SEGMENT_BITS) | CONTINUE_BIT);
-            value = (value as u64 >> 7) as i64;
+        if (byte & CONTINUE_BIT) == 0 {
+            buf.advance(i + 1);
+            return Ok(value);
         }
+
+        position += 7;
     }
+
+    Err(Error::Overflow)
 }
 
-impl Deref for VarLong {
-    type Target = i64;
+pub fn serialize<B: BufMut>(value: &i64, buf: &mut B) {
+    let mut value = *value;
+    loop {
+        if (value & !(SEGMENT_BITS as i64)) == 0 {
+            buf.put_u8(value as u8);
+            break;
+        }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<i64> for VarLong {
-    fn from(value: i64) -> Self {
-        Self(value)
+        buf.put_u8((value as u8 & SEGMENT_BITS) | CONTINUE_BIT);
+        value = (value as u64 >> 7) as i64;
     }
 }
 
@@ -99,12 +77,11 @@ mod test {
         for (expected_num, bytes) in TEST_CASES {
             let mut buf = Bytes::from_static(bytes);
 
-            let var_long = VarLong::deserialize(&mut buf);
+            let var_long = deserialize(&mut buf);
             assert!(var_long.is_ok());
 
             let var_long = var_long.unwrap();
-            let int = *var_long;
-            assert_eq!(int, expected_num);
+            assert_eq!(var_long, expected_num);
 
             assert_eq!(buf.len(), 0);
         }
@@ -113,10 +90,8 @@ mod test {
     #[test]
     fn test_serialize() {
         for (num, reader) in TEST_CASES {
-            let var_long: VarLong = num.into();
-
             let mut bytes = BytesMut::new();
-            var_long.serialize(&mut bytes);
+            serialize(&num, &mut bytes);
             assert_eq!(&bytes, reader);
         }
     }

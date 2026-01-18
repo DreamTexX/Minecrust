@@ -2,7 +2,7 @@ use std::io::copy;
 
 use bytes::{Buf, BufMut, BytesMut};
 use flate2::read::ZlibDecoder;
-use minecrust_protocol::{Deserialize, datatype::VarInt};
+use minecrust_protocol::datatype::var_int;
 use tokio_util::codec::Decoder;
 
 use crate::{Error, crypto::Cfb8Cipher, packet::RawPacket};
@@ -30,10 +30,10 @@ impl PacketDecoder {
         let buffer_before_size = src.remaining();
         match self.pending_frame_length {
             Some(length) => Ok(Some(length)),
-            None => match VarInt::deserialize(src) {
+            None => match var_int::deserialize(src) {
                 // Deserialize only consumes on success
                 Ok(var_int) => {
-                    let var_int = *var_int as usize;
+                    let var_int = var_int as usize;
                     self.pending_frame_length = Some(var_int);
 
                     self.cipher_cursor = self
@@ -51,7 +51,7 @@ impl PacketDecoder {
 
     fn inflate(&mut self, frame: &mut BytesMut) -> Result<(), Error> {
         if self.threshold.is_some() {
-            let data_length = *VarInt::deserialize(frame)?;
+            let data_length = var_int::deserialize(frame)?;
 
             if data_length > 0 {
                 tracing::trace!("received packet must be inflated");

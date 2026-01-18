@@ -2,8 +2,10 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Error, Fields};
 
+use crate::FieldAttributes;
+
 pub fn parse_deserialize(input: DeriveInput) -> TokenStream {
-    let fn_body = match parse_deserialize_data(&input.data) {
+    let fn_body = match parse_deserialize_data(input.data) {
         Ok(stream) => stream,
         Err(err) => return err.into_compile_error(),
     };
@@ -19,30 +21,53 @@ pub fn parse_deserialize(input: DeriveInput) -> TokenStream {
     }
 }
 
-fn parse_deserialize_data(data: &Data) -> Result<TokenStream, Error> {
+fn parse_deserialize_data(data: Data) -> Result<TokenStream, Error> {
     match data {
         Data::Struct(data) => Ok(match data.fields {
-            Fields::Named(ref fields) => {
-                let struct_contents = fields.named.iter().map(|field| {
-                    let field_ident = &field.ident;
-                    let field_type = &field.ty;
-                    quote! {
-                        #field_ident: <#field_type>::deserialize(buf)?,
-                    }
-                });
+            Fields::Named(mut fields) => {
+                let struct_contents = fields
+                    .named
+                    .iter_mut()
+                    .map(|field| {
+                        let FieldAttributes { with } = deluxe::extract_attributes(field)?;
+                        let field_ident = &field.ident;
+
+                        Ok(if let Some(with) = with {
+                            quote! {
+                                #field_ident: #with::deserialize(buf)?,
+                            }
+                        } else {
+                            let field_type = &field.ty;
+                            quote! {
+                                #field_ident: <#field_type>::deserialize(buf)?,
+                            }
+                        })
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?;
                 quote! {
                     Ok(Self {
                         #(#struct_contents)*
                     })
                 }
             }
-            Fields::Unnamed(ref fields) => {
-                let struct_contents = fields.unnamed.iter().map(|field| {
-                    let field_type = &field.ty;
-                    quote! {
-                        #field_type::deserialize(buf)?,
-                    }
-                });
+            Fields::Unnamed(mut fields) => {
+                let struct_contents = fields
+                    .unnamed
+                    .iter_mut()
+                    .map(|field| {
+                        let FieldAttributes { with } = deluxe::extract_attributes(field)?;
+                        Ok(if let Some(with) = with {
+                            quote! {
+                                #with::deserialize(buf)?,
+                            }
+                        } else {
+                            let field_type = &field.ty;
+                            quote! {
+                                #field_type::deserialize(buf)?,
+                            }
+                        })
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?;
                 quote! {
                     Ok(Self(#(#struct_contents)*))
                 }

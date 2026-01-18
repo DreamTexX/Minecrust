@@ -2,7 +2,7 @@ use bytes::Bytes;
 use minecrust_protocol_macro::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::datatype::VarInt;
+use crate::datatype::var_int;
 
 #[derive(Debug)]
 pub enum LoginPacket {
@@ -30,7 +30,8 @@ pub struct Key {
 /// Login | 0x02
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CustomQueryAnswer {
-    pub message_id: VarInt,
+    #[protocol(with = var_int)]
+    pub message_id: i32,
     pub data: Option<Bytes>,
 }
 

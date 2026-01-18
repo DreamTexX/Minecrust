@@ -45,14 +45,15 @@ struct Context {
 }
 
 fn get_dispatcher(context: &Context) -> Result<Box<dyn Dispatcher + Send>, ConnectionError> {
-    let dispatcher: Box<dyn Dispatcher + Send> = match (context.protocol_state, context.protocol_version) {
-        (ProtocolState::Status, 773..) => Box::new(dispatcher::v773::StatusDispatcher),
-        (ProtocolState::Login, 773..) => Box::new(dispatcher::v773::LoginDispatcher::new()),
-        (_, _) => {
-            tracing::error!(?context, "no dispatcher found");
-            return Err(ConnectionError::Custom("no dispatcher found"));
-        }
-    };
+    let dispatcher: Box<dyn Dispatcher + Send> =
+        match (context.protocol_state, context.protocol_version) {
+            (ProtocolState::Status, 773..) => Box::new(dispatcher::v773::StatusDispatcher),
+            (ProtocolState::Login, 773..) => Box::new(dispatcher::v773::LoginDispatcher::new()),
+            (_, _) => {
+                tracing::error!(?context, "no dispatcher found");
+                return Err(ConnectionError::Custom("no dispatcher found"));
+            }
+        };
 
     Ok(dispatcher)
 }
@@ -79,6 +80,7 @@ pub(crate) async fn handle_connection(
         let actions = dispatcher.dispatch(raw_packet)?;
 
         tracing::trace!(?actions, "running action");
+        let mut context_changed = false;
         for action in actions {
             match action {
                 Action::EnableEncryption(shared_secret) => {
@@ -89,16 +91,19 @@ pub(crate) async fn handle_connection(
                 }
                 Action::ProtocolState(new_protocol_state) => {
                     context.protocol_state = new_protocol_state;
-                    dispatcher = get_dispatcher(&context)?;
+                    context_changed = true;
                 }
                 Action::ProtocolVersion(new_protocol_version) => {
                     context.protocol_version = new_protocol_version;
-                    dispatcher = get_dispatcher(&context)?;
+                    context_changed = true;
                 }
                 Action::SendPacket(packet) => {
                     stream.send(packet).await?;
                 }
             }
+        }
+        if context_changed {
+            dispatcher = get_dispatcher(&context)?;
         }
     }
 

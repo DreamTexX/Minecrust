@@ -1,9 +1,9 @@
 use bytes::{Bytes, BytesMut};
-use minecrust_protocol::{Deserialize, Error, Serialize, datatype::VarInt};
+use minecrust_protocol::{Deserialize, Error, Serialize, datatype::var_int};
 
 #[derive(Debug, Clone)]
 pub struct RawPacket {
-    pub id: VarInt,
+    pub id: i32,
     pub data: Bytes,
 }
 
@@ -11,7 +11,7 @@ impl TryFrom<BytesMut> for RawPacket {
     type Error = Error;
 
     fn try_from(mut data: BytesMut) -> Result<Self, Self::Error> {
-        let id = VarInt::deserialize(&mut data)?;
+        let id = var_int::deserialize(&mut data)?;
 
         Ok(RawPacket {
             id,
@@ -25,7 +25,7 @@ impl<S: Serialize> From<(i32, S)> for RawPacket {
         let mut buffer = BytesMut::new();
         data.serialize(&mut buffer);
         Self {
-            id: VarInt::from(id),
+            id,
             data: buffer.freeze(),
         }
     }

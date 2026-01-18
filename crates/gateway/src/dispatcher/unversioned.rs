@@ -15,7 +15,7 @@ impl Dispatcher for HandshakeDispatcher {
         let handshake: Intention = raw_packet.try_into()?;
         tracing::trace!(?handshake, "performing handshake");
 
-        state_changes.push(Action::ProtocolVersion(*handshake.protocol_version as u32));
+        state_changes.push(Action::ProtocolVersion(handshake.protocol_version as u32));
         state_changes.push(match handshake.intent {
             Intent::Login => Action::ProtocolState(ProtocolState::Login),
             Intent::Status => Action::ProtocolState(ProtocolState::Status),

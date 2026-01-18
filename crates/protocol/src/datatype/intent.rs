@@ -1,6 +1,6 @@
 use bytes::Buf;
 
-use crate::{Deserialize, Error, Serialize, datatype::VarInt};
+use crate::{Deserialize, Error, Serialize, datatype::var_int};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Intent {
@@ -9,9 +9,9 @@ pub enum Intent {
     Transfer = 3,
 }
 
-impl From<VarInt> for Intent {
-    fn from(value: VarInt) -> Self {
-        match *value {
+impl From<i32> for Intent {
+    fn from(value: i32) -> Self {
+        match value {
             1 => Self::Status,
             2 => Self::Login,
             3 => Self::Transfer,
@@ -32,13 +32,13 @@ impl From<&Intent> for i32 {
 
 impl Deserialize for Intent {
     fn deserialize<B: Buf>(buf: &mut B) -> Result<Self, Error> {
-        VarInt::deserialize(buf).map(|i| i.into())
+        var_int::deserialize(buf).map(|i| i.into())
     }
 }
 
 impl Serialize for Intent {
     fn serialize<B: bytes::BufMut>(&self, buf: &mut B) {
         let value: i32 = self.into();
-        VarInt::from(value).serialize(buf);
+        var_int::serialize(&value, buf);
     }
 }

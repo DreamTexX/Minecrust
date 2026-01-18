@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use minecrust_protocol_macro::Serialize;
 
-use crate::datatype::{GameProfile, TextComponent, VarInt};
+use crate::datatype::{GameProfile, TextComponent, var_int};
 
 #[derive(Debug, Serialize)]
 pub struct LoginDisconnect(pub TextComponent);
@@ -18,11 +18,12 @@ pub struct Hello {
 pub struct LoginFinished(pub GameProfile);
 
 #[derive(Debug, Serialize)]
-pub struct LoginCompression(pub VarInt);
+pub struct LoginCompression(#[protocol(with = var_int)] pub i32);
 
 #[derive(Debug, Serialize)]
 pub struct CustomQuery {
-    pub message_id: VarInt,
+    #[protocol(with = var_int)]
+    pub message_id: i32,
     pub channel: String,
     pub data: Bytes,
 }
